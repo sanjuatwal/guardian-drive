@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Guardian Drive",
+    "slug": "guardian-drive",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./theme/assets/brand-logo.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#05070B"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.guardiandrive.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#05070B"
+      },
+      "package": "com.guardiandrive.app"
+    },
+    "platforms": ["ios", "android"]
+  }
+}

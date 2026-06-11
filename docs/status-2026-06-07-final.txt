@@ -1,0 +1,271 @@
+Guardian Drive - Session Status Update
+Date: June 7, 2026 — End of Day
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SESSION SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Completed Today:**
+- Paused firmware development for hardware procurement checklist (3 items ordered, 5 total secured).
+- Resumed from June 4 status and extended IMU baseline calibration logic.
+- Added debouncing for tilt alert stability (3 consecutive threshold breaches).
+- Built structured event output format (event_id, sensor_type, severity, timestamp_ms, payload).
+- **NEW: Created EventLogger module (src/core/EventLogger.h/cpp)** — handles event emission to serial.
+- **NEW: Created StateManager module (src/core/StateManager.h/cpp)** — device state machine (NORMAL, SUSPICIOUS, THEFT_CANDIDATE, THEFT_MODE).
+- Integrated EventLogger and StateManager into main.cpp tilt detection flow.
+- Added no-hardware simulation mode fallback when MPU-6050 init fails.
+- Added serial command 'r' to reset parked baseline without reflashing.
+- Firmware compiles cleanly with all core modules in place.
+
+**Blocked by Hardware:**
+- ESP32 serial connection currently unavailable (likely unplugged during soldering work).
+- IMU component requires header pin soldering before breadboard wiring validation.
+- Cannot upload/test simulation output until device reconnected.
+
+**Architecture in Place:**
+```
+src/
+├── main.cpp                    (entry, simulation/real IMU selection, baseline logic)
+├── core/
+│   ├── EventLogger.h/cpp       ✓ (event struct, log interface)
+│   ├── StateManager.h/cpp      ✓ (state enum + transitions)
+│   └── [FUTURE] RiskEngine.h/cpp, ThreatResponse.h/cpp, EvidenceVault.h/cpp
+├── sensors/
+│   ├── IMUSensor.h             (interface, never changes)
+│   ├── IMUSensor_MPU6050.h/cpp (dev implementation, swappable on hardware day)
+│   └── [FUTURE] ProximityChecker.h (BLE + key tag stubs)
+└── comms/
+    └── [FUTURE] Alerts.h/cpp (siren, tracking, backend notifications)
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT FIRMWARE BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+On boot:
+- Attempts MPU-6050 init over I2C (SDA GPIO8, SCL GPIO9).
+- If init fails → activates simulation mode (no hardware needed).
+- If init succeeds → uses real IMU data.
+
+Runtime:
+- Captures first 50 samples to set parked baseline (pitch/roll).
+- On subsequent samples:
+  - Computes delta vs baseline
+  - If delta > 8.0 deg for 3 consecutive samples → fires tilt alert
+  - Alert triggers state transition to SUSPICIOUS
+  - Event logged via EventLogger: "EVENT|event_id=...|sensor_type=imu_tilt|severity=high|timestamp_ms=...|payload=..."
+  
+Serial commands:
+- Press 'r' or 'R' to reset baseline and recalibrate (useful for testing after tilting).
+
+Build status: ✓ PASSING (PlatformIO)
+Code size: 5.9% RAM, 8.6% Flash (plenty of room for more modules)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+READY-TO-RESUME CHECKLIST (HARDWARE DAY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Solder MPU-6050 header pins ✓ (you're doing this)
+2. Wire breadboard:
+   - MPU VCC → ESP32 3V3
+   - MPU GND → ESP32 GND
+   - MPU SDA → ESP32 GPIO8
+   - MPU SCL → ESP32 GPIO9
+   - MPU AD0 → ESP32 GND (sets address 0x68)
+3. Reconnect ESP32 USB
+4. Run: cd guardian-firmware && ~/.platformio/penv/bin/pio run --target upload
+5. Open monitor: ~/.platformio/penv/bin/pio device monitor --baud 115200
+6. Expected output:
+   - MPU-6050 init: OK (instead of FAIL)
+   - Calibrating baseline... 1/50, 2/50, ... 50/50
+   - Park baseline set: pitch=X.XX roll=X.XX
+   - Live tilt delta output every 300ms
+   - When you tilt the board >8°: SUSPICIOUS TILT alert + EVENT line
+
+No code changes needed on hardware day — just wire and test.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL UNIMPLEMENTED (Still Stubbed)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+These are decision points from today's architecture questions:
+
+1. **Siren Activation Logic**
+   - When state → THEFT_CANDIDATE, activate siren + GPS tracking automatically
+   - Do not wait for owner response
+   - Never cut main battery, only arm start-inhibit relay if speed < 8 km/h
+   - → Needs ThreatResponse module (not yet built)
+
+2. **BLE Proximity + Key Tag Detection**
+   - Detect if owner's phone is nearby (BLE RSSI)
+   - Detect if Guardian Key Tag is nearby
+   - Theft decision table:
+     | Phone | Key Tag | Unlock/Start | Action |
+     | Yes   | —       | Any          | Authorized |
+     | No    | Yes     | Any          | Authorized key-only |
+     | No    | No      | Yes          | **THEFT** |
+   - → Needs ProximityChecker module (stub only now, build at hardware phase)
+
+3. **Police PDF + Evidence Hashing**
+   - Event struct needs SHA-256 hash chain
+   - EvidenceVault module signs and seals events
+   - Generate PDF with hashed timeline
+   - → Week 8 work, skeleton only now (stub functions in place)
+
+These will be built when you confirm real IMU works and want to scale to real theft scenarios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PROCUREMENT STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5 items already ordered/received (confirmed):
+✓ Freenove ESP32-S3
+✓ MPU-6050 x5
+✓ Breadboard + jumper kit
+✓ Logic level shifter x5
+⦙ INMP441 microphone (arriving June 15-25, passive only)
+
+Full remaining project BOM with procurement prioritization:
+See: docs/master-procurement-checklist.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEXT SESSION PRIORITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. (Hardware blocker until soldering done)
+   Get IMU wired and verified working over I2C with real baseline + tilt alerts.
+
+2. (Post-hardware-verification)
+   Build ProximityChecker stubs — BLE phone/key tag detection frame
+   (leave implementations blank, just wire into threat decision logic)
+
+3. (Post-threat-logic)
+   Build ThreatResponse module — siren, tracking, relay activation stubs
+   (wire into StateManager transitions)
+
+4. (Post-MVP logic validation in simulation)
+   Build EvidenceVault skeleton — event hashing, PDF generation prep
+   (full implementation in Week 8 after everything else works)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILES CREATED/MODIFIED TODAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+New files:
+- src/core/EventLogger.h
+- src/core/EventLogger.cpp
+- src/core/StateManager.h
+- src/core/StateManager.cpp
+- docs/master-procurement-checklist.md
+- docs/status-2026-06-07.txt (multiple updates)
+
+Modified files:
+- src/main.cpp (baseline logic, debounce, simulation mode, serial reset command)
+- guardian-firmware/platformio.ini (no changes needed, already correct)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL NOTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The firmware architecture is now multi-layered from day 1:
+- **Simulation mode** lets you test detection logic without hardware
+- **Modular core** (EventLogger, StateManager) can swap implementations later
+- **HAL interface** (IMUSensor) means MPU-6050 → ICM-42688-P (production) is a one-file change
+- **Zero-to-real** transition is just wiring + no code changes
+
+Good stopping point for today. Once you finish soldering and reconnect, the next session will be purely validation + expansion.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+APP WORK — PARKED (started June 7, resume when ready)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Decision: Start app in parallel while firmware is hardware-blocked.
+
+Design reference: UI mockup image captured. 4 screens identified:
+  1. Dashboard — vehicle status, quick actions, nav bar
+  2. Critical Alert — full-screen takeover, "Confirm Theft" button, reason list
+  3. Live Recovery — map with route trail, speed, last update, Police Pack button
+  4. Protection Center — system health, GPS/LTE/battery/key tag status, vehicle modes
+
+Brand: second logo image provided (dark shield, gold glow, "GUARDIAN DRIVE / SECURED")
+  - Logo needs recoloring: gold (#C9A840) → emerald (#00E3B0), highlight → cyan (#00D1FF)
+  - User to recolor using Photopea (free) or re-generate with AI prompt (saved in last message)
+  - Drop final file into: app/theme/assets/brand-logo.png
+
+Theme files created:
+  - app/theme/tokens.ts     (colors, typography, spacing, motion, radius)
+  - app/theme/assetManifest.ts  (asset key-to-filename map)
+  - app/theme/assets/       (drop images here)
+  - app/README.md           (updated with asset drop instructions)
+
+Color palette locked:
+  Deep Black:  #05070B  (app background)
+  Graphite:    #0E1116  (screen base)
+  Carbon:      #171B22  (card base)
+  Emerald:     #00E3B0  (primary accent, logo glow target)
+  Cyan:        #00D1FF  (secondary accent, logo highlight target)
+  Red Alert:   #FF3B30  (theft/alert state)
+  Text:        #E6F1FF / #93A3B8
+  Font:        Satoshi (Bold / Medium / Regular)
+
+Next app session — resume here:
+  1. Confirm logo recolor done and dropped into assets/
+  2. Decide framework: React Native (Expo) vs Flutter
+  3. Scaffold project with existing folder plan from app/README.md
+  4. Build Dashboard screen using tokens.ts and brand-logo.png
+  5. Build AlertScreen with full-screen takeover and "Confirm Theft" button
+
+Final UI direction locked from latest image review:
+   - Home screen is the command hub
+   - Recovery is the full live-map workspace
+   - Check is the health / diagnostics workspace
+   - Alerts is the incident / explanation workspace
+   - Settings replaces vague "More" for MVP structure clarity
+
+Final Home quick actions locked:
+   1. View Location
+   2. Service Mode
+   3. Find Key Tag
+   4. Trigger Siren
+
+Home behavior decisions locked:
+   - View Location stays on Home permanently and opens Recovery
+   - Service Mode opens a simple bottom sheet with 3 choices:
+         * 1 Hour
+         * 4 Hours
+         * Until Turned Off
+   - Find Key Tag stays on Home and opens a simple locate utility
+   - Report Theft should not be a permanent normal-state Home quick action; show it in active alert flows instead
+
+Key Tag UX decisions locked:
+   - Key tag status appears in Home protection summary
+   - Key tag quick action exists on Home for easy access
+   - Key tag utility should show:
+         * connection status
+         * last seen time
+         * signal strength / proximity
+         * play sound / locate action
+
+Critical mobile alert requirements captured:
+   - Theft siren event must generate a high-importance mobile alert, not a normal notification
+   - Alert should show action choices equivalent to:
+         * Confirm Theft
+         * It's Me
+   - App should present a full-screen critical alert UI when opened from the notification
+   - Notification tone should be a specific Guardian Drive alert sound shared across users
+
+Platform constraints / implementation notes:
+   - Android: high-priority notifications, custom sounds, full-screen intents, and action buttons are supported more directly
+   - iOS: critical alerts are possible only with Apple's Critical Alerts entitlement/approval; otherwise use high-priority push + custom in-app full-screen takeover after open
+   - iOS action buttons on notifications are supported, but true alarm-style interruption is more restricted than Android
+   - Custom Guardian Drive alert tone is feasible on both platforms, but iOS behavior depends on notification category + app permissions and may still be more constrained than Android
+
+Escalation idea captured for later backend/app design:
+   - If owner does not respond after repeated urgent notifications, escalate to automated phone calling
+   - Desired future flow:
+         1. push alert 1
+         2. push alert 2
+         3. automated call with voice message
+   - Likely implementation path: backend telephony provider (for example Twilio) places call and plays pre-recorded or TTS theft warning
+   - This should be treated as backend/app integration work, not firmware work
+   - Needs per-user consent, emergency contact rules, retry policy, and regional compliance review

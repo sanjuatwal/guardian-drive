@@ -1,0 +1,102 @@
+Guardian Drive - Session Status
+Date: June 7, 2026
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PROJECT RESUME SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reference status reviewed: docs/status-2026-06-04.txt
+Resume focus: continue Week 1 firmware work from IMU bench stage.
+
+Today completed:
+- Verified codebase is already on HAL-style IMU interface + MPU6050 driver.
+- Updated firmware main loop to add parked-baseline calibration.
+- Added tilt delta detection and suspicious tilt alert threshold.
+- Added consecutive-sample debounce for tilt alert stability.
+- Added structured tilt event output line (event_id, sensor_type, severity, timestamp_ms, payload).
+- Added no-hardware simulation mode fallback when MPU-6050 init fails.
+- Added serial command 'r' to reset parked baseline without reflashing.
+- Confirmed project builds successfully in PlatformIO.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT FIRMWARE BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: guardian-firmware/src/main.cpp
+
+On boot:
+- Prints device online message.
+- Tries to initialize MPU-6050 over I2C (SDA GPIO8, SCL GPIO9).
+- If IMU init fails, automatically switches to simulation mode.
+
+Runtime:
+- Captures first 50 samples to establish parked baseline.
+- Stores baseline pitch/roll averages.
+- Prints accel + tilt values continuously.
+- Computes live tilt delta vs baseline.
+- Uses 3 consecutive threshold breaches to avoid noisy alerts.
+- Emits "SUSPICIOUS TILT" message when delta > 8.0 degrees.
+- Emits structured EVENT line for backend contract prototyping.
+- Accepts serial command 'r' to reset baseline and re-calibrate.
+
+Build status:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Already ordered/received (5):
+- Freenove ESP32-S3
+- MPU-6050 x5
+- Breadboard + jumper kit
+- Logic level shifter x5
+- INMP441 mic (passive evidence only)
+
+Current blocker:
+- MPU-6050 breakout requires header pins to be soldered before reliable breadboard wiring.
+- Hardware IMU validation is blocked until soldering iron/session is available.
+
+Workaround active:
+- Firmware simulation mode now allows detection/event logic development without soldering.
+- MPU-6050 x5
+- Breadboard + jumper kit
+- Logic level shifter x5NO SOLDERING PATH)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Upload firmware and verify simulation serial sequence:
+   - baseline calibration 1..50
+   - baseline set
+   - periodic simulated tilt spike
+   - suspicious tilt + EVENT line output
+
+2. Build EventLogger module skeleton in src/core/:
+   - Event struct type
+   - append/print stub
+   - route current EVENT emit through logger interface
+
+3. Add simple state manager enum and transitions:
+   - NORMAL -> SUSPICIOUS -> THEFT_CANDIDATE
+   - driven by tilt threshold and debounce signals
+
+4. Prepare hardware-resume checklist for solder day:
+   - solder header pins
+   - run I2C scanner
+   - verify address 0x68/0x69
+   - switch from simulation back to live IMU
+   - avoids noise-triggered spam
+
+3. Add event struct output format (proto for backend):
+   - event_id, sensor_type, severity, timestamp_ms, payload
+
+4. Add parked-baseline reset trigger:
+   - command or button path to re-calibrate after installation angle changes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KEY COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:
+cd /Users/palakmejpara/guardian-drive/guardian-firmware && ~/.platformio/penv/bin/pio run
+
+Upload:
+cd /Users/palakmejpara/guardian-drive/guardian-firmware && ~/.platformio/penv/bin/pio run --target upload
+
+Monitor:
+cd /Users/palakmejpara/guardian-drive/guardian-firmware && ~/.platformio/penv/bin/pio device monitor --baud 115200

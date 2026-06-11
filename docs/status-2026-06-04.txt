@@ -1,0 +1,299 @@
+Guardian Drive — Session Status
+Date: June 4, 2026
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HARDWARE STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Arrived today (June 4):
+- Freenove ESP32-S3 board (8MB Flash, WiFi+BLE)
+- MPU-6050 GY-521 x5 (tilt/tow sensor — DEV only)
+- BOJACK breadboard kit (830pt + 400pt + 6 mini + 65 wires)
+- KIRO&SEEU Logic Level Shifter x5 (5V<->3.3V)
+
+Arriving June 15-25:
+- INMP441 I2S Microphone — PASSIVE ONLY, glass break removed from MVP
+
+Still to order — CORRECTED production-aware list (Phase 2-6):
+- u-blox NEO-M9N GPS (~$25) — NOT NEO-6M (EOL)
+- Quectel BG95-M3 LTE (~$30) — NOT SIM7600G-H (power hungry, Cat-4 overkill)
+- SN65HVD230 CAN transceiver (~$4) — NOT MCP2515 (5V, wrong for ESP32)
+- OBD-II breakout cable (~$8)
+- BQ24074 power-path charger module (~$8) — NOT TP4056 (no load sharing)
+- Li-ion 5000-7000mAh battery (~$20) — size to confirm after current measurement
+- W25Q64 SPI NOR Flash (~$3) — evidence logs
+- ATECC608B secure element (~$4) — cryptographic signing for evidence vault
+- MOSFET relay module (~$4) — siren + start inhibit relay driver
+- Automotive 12V->5V buck + TVS + fuse (~$12)
+- Micro SD card (~$3) — debug/raw logs only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIRMWARE STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project location: /Users/palakmejpara/guardian-drive/guardian-firmware
+Board: esp32-s3-devkitc-1
+Framework: Arduino (via PlatformIO)
+PlatformIO binary: ~/.platformio/penv/bin/pio
+
+Build: PASSING (exit code 0)
+Upload: PASSING (exit code 0) — firmware is on the board
+
+platformio.ini fix applied (serial over native USB):
+  build_flags = -DARDUINO_USB_CDC_ON_BOOT=1
+  monitor_speed = 115200
+
+Current firmware (main.cpp):
+  - Prints "Guardian Drive — ESP32-S3 online." on boot
+  - Prints "heartbeat" every 1 second
+  - No sensor code yet
+
+Serial monitor: ~/.platformio/penv/bin/pio device monitor
+Port: /dev/cu.usbmodem11401
+
+NEXT STEP: Confirm heartbeat in serial monitor, then wire MPU-6050.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE DECISIONS (CONFIRMED TODAY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DECISION 1: Hardware Abstraction Layer (HAL) from day 1
+  - Business logic talks to interfaces, never hardware directly
+  - Swapping MPU-6050 -> ICM-42688-P = rewrite one driver file only
+  - Agreed: prototype and production use same logic, minimal change to switch
+
+DECISION 2: Prototype hardware is DEV only (not shipped to customers)
+  - MPU-6050, breadboard, TP4056 = bench testing only
+  - Production parts (ICM-42688-P, NEO-M9N, BG95-M3, BQ24074) ordered for
+    real car testing and manufacturing
+  - Production BOM locked in hardware/BOM.md
+
+DECISION 3: Glass break / microphone removed from MVP
+  - INMP441 mic arriving June 15-25 but will NOT be wired for MVP
+  - Glass break = Nice to Have, post V1.5
+  - No firmware work for audio detection until after V1.5 ships
+
+DECISION 4: CAN bus approach corrected
+  - Use ESP32 built-in TWAI + SN65HVD230 CAN transceiver
+  - NOT MCP2515 (5V logic, wrong for ESP32-S3)
+  - Simpler wiring, no SPI overhead, no level shifter needed
+
+DECISION 5: Power management corrected
+  - BQ24074 power-path charger for all car-connected testing and production
+  - TP4056 acceptable for bench current measurements only
+  - Target battery: 5000-7000mAh (measure actual draw in Week 4 first)
+
+Planned firmware folder structure (HAL):
+  src/
+  ├── main.cpp                     <- entry point only
+  ├── core/
+  │   ├── RiskEngine.cpp           <- theft detection (never changes)
+  │   ├── EventLogger.cpp          <- evidence logging (never changes)
+  │   └── StateManager.cpp         <- states: normal/suspicious/theft/valet
+  ├── sensors/
+  │   ├── IMUSensor.h              <- interface (never changes)
+  │   ├── IMUSensor_MPU6050.cpp    <- dev driver (swap for ICM-42688-P in prod)
+  │   ├── GPSSensor.h              <- interface (never changes)
+  │   └── GPSSensor_NEOM9N.cpp     <- driver (same for dev + prod)
+  └── comms/
+      ├── Alerts.h                 <- interface (never changes)
+      └── Alerts_WiFi.cpp          <- dev (swap to BG95-M3 LTE for car testing)
+
+This structure to be created BEFORE writing any sensor code (Week 1).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUSINESS / PRICING (calculated today)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Production cost per unit (at 100 units): ~$146 CAD
+Retail price target: $299-$349 CAD
+Hardware margin per unit: ~$153-203 CAD
+Monthly subscription: $12-15/month
+Recurring cost/month per device: ~$4
+Subscription margin: ~$8-11/month
+
+100 unit manufacturing run: ~$21,000 CAD total investment
+Revenue from 100 units sold + 6 months subscription: ~$37,200 CAD
+Net profit from 100 units: ~$16,200 CAD
+
+B2B exit estimates:
+  1,000 subscribers: $500K-$1.2M acquisition
+  10,000 subscribers: $4M-$11M acquisition
+  Most likely buyer: Insurance company (Intact/Aviva style) for data moat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DOCS UPDATED TODAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+hardware/BOM.md         - Full rewrite: DEV vs PRODUCTION split, corrected components
+docs/feature-document.md - Uploaded final feature spec
+docs/project-plan.md    - Hardware references corrected (NEO-M9N, BG95-M3, SN65HVD230)
+                        - Microphone sprint removed
+                        - Battery target updated to 5000-7000mAh Li-ion
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMMEDIATE NEXT ACTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Confirm serial monitor shows "heartbeat":
+   ~/.platformio/penv/bin/pio device monitor
+
+2. Create HAL folder structure in guardian-firmware/src/ BEFORE sensor code
+
+3. Wire MPU-6050 to ESP32-S3:
+   VCC -> 3.3V, GND -> GND, SDA -> GPIO8, SCL -> GPIO9 (Freenove board)
+
+4. Write IMUSensor.h interface + IMUSensor_MPU6050.cpp driver
+
+5. Read and print X/Y/Z accelerometer + tilt angle to serial
+
+6. Save parked baseline angle, detect delta change
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KEY COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:          ~/.platformio/penv/bin/pio run
+Upload:         ~/.platformio/penv/bin/pio run --target upload
+Monitor:        ~/.platformio/penv/bin/pio device monitor
+Upload+Monitor: ~/.platformio/penv/bin/pio run --target upload && ~/.platformio/penv/bin/pio device monitor
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HARDWARE STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Arrived today (June 4):
+- Freenove ESP32-S3 board (8MB Flash, WiFi+BLE)
+- MPU-6050 GY-521 x5 (tilt/tow sensor)
+- BOJACK breadboard kit (830pt + 400pt + 6 mini + 65 wires)
+- KIRO&SEEU Logic Level Shifter x5 (5V<->3.3V)
+
+Arriving June 15-25:
+- INMP441 I2S Microphone (glass break audio — Nice to Have / deferred)
+
+Still to order (Phase 1, Week 3+):
+- u-blox NEO-6M GPS (~$8)
+- SIM7600G-H LTE modem (~$35) + SIM card
+- OBD-II cable + MCP2515 CAN module (~$12)
+- LiPo 3.7V 2000mAh + TP4056 charger (~$12)
+- 12V piezo buzzer siren (~$5)
+- Micro SD card module (~$3)
+- 12V->5V step-down regulator (~$3)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIRMWARE STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project location: /Users/palakmejpara/guardian-drive/guardian-firmware
+Board: esp32-s3-devkitc-1
+Framework: Arduino (via PlatformIO)
+PlatformIO binary: ~/.platformio/penv/bin/pio
+
+Build: PASSING (exit code 0)
+Upload: PASSING (exit code 0) — firmware is on the board
+
+Serial monitor issue: Disconnect loop fixed by adding to platformio.ini:
+  build_flags = -DARDUINO_USB_CDC_ON_BOOT=1
+  monitor_speed = 115200
+
+Current firmware (main.cpp):
+  - Prints "Guardian Drive — ESP32-S3 online." on boot
+  - Prints "heartbeat" every 1 second
+  - No sensor code yet
+
+Serial monitor command:
+  ~/.platformio/penv/bin/pio device monitor
+  Port: /dev/cu.usbmodem11401
+
+NEXT STEP: Verify "heartbeat" output is visible in serial monitor,
+then wire MPU-6050 and write first sensor read.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE DECISION (made today)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+We will use a Hardware Abstraction Layer (HAL) from day 1.
+All business logic talks to interfaces, never to hardware directly.
+Swapping dev sensors (MPU-6050) for production sensors (ICM-42688-P)
+means rewriting one driver file only — no logic changes.
+
+Planned folder structure:
+  src/
+  ├── main.cpp                     <- entry point only
+  ├── core/
+  │   ├── RiskEngine.cpp           <- theft detection (never changes)
+  │   ├── EventLogger.cpp          <- evidence logging (never changes)
+  │   └── StateManager.cpp         <- states: normal/suspicious/theft/valet
+  ├── sensors/
+  │   ├── IMUSensor.h              <- interface (never changes)
+  │   ├── IMUSensor_MPU6050.cpp    <- dev driver (swap for production)
+  │   ├── GPSSensor.h              <- interface (never changes)
+  │   └── GPSSensor_NEO6M.cpp      <- dev driver (swap for production)
+  └── comms/
+      ├── Alerts.h                 <- interface (never changes)
+      └── Alerts_WiFi.cpp          <- dev (swap to LTE for production)
+
+This structure has NOT been created yet — do it in Week 1 Sprint 1.1
+before writing any sensor code.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE DOCUMENT STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: /Users/palakmejpara/guardian-drive/docs/feature-document.md
+Status: UPLOADED — full final feature document is in place
+
+Glass break detection: moved to "Nice to Have" (post V1.5)
+  - INMP441 mic was already ordered, arriving late June
+  - Will decide whether to include after V1.5 ships
+  - No firmware work for glass break until then
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MVP FEATURE SCOPE (confirmed)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IN MVP:
+- Relay attack detection (phone + key tag + unlock mismatch)
+- Tow/tilt detection with parked baseline angle
+- Unauthorized start detection
+- Battery disconnect alert + backup battery switchover
+- Theft mode with live GPS (adaptive ping rate)
+- External siren (relay-driven, remote trigger)
+- Critical app alert (full-screen, bypass DND)
+- Risk score explanation
+- Timeline + one-tap police PDF
+- Installer validation checklist (8-point)
+- Crash vs theft classification
+- Phone-dead + key tag dead fallback (PIN, grace mode)
+
+NOT IN MVP (V1.5):
+- OBD tamper detection
+- Jamming detection
+- Valet / service / tow modes
+- Household access profiles
+- Door/hood/trunk correlation
+- Cryptographic evidence lock
+
+NOT IN MVP (Nice to Have):
+- Glass break detection
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMMEDIATE NEXT ACTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Confirm serial monitor shows "heartbeat" (run: ~/.platformio/penv/bin/pio device monitor)
+2. Wire MPU-6050 to ESP32-S3 over I2C (SDA=GPIO8, SCL=GPIO9 on Freenove board)
+3. Create HAL folder structure in guardian-firmware/src/ before writing sensor code
+4. Write IMUSensor.h interface + IMUSensor_MPU6050.cpp driver
+5. Read and print accelerometer X/Y/Z values to serial
+6. Implement parked baseline angle logic
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KEY COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:   ~/.platformio/penv/bin/pio run
+Upload:  ~/.platformio/penv/bin/pio run --target upload
+Monitor: ~/.platformio/penv/bin/pio device monitor
+Combined upload + monitor:
+         ~/.platformio/penv/bin/pio run --target upload && ~/.platformio/penv/bin/pio device monitor
