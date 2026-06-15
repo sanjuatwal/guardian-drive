@@ -52,3 +52,25 @@ bool AlertsWiFi::sendEvent(const Event& evt) {
 
   return httpCode == 200;
 }
+
+bool AlertsWiFi::checkFalseAlarm() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+
+  HTTPClient http;
+  http.begin(String(BACKEND_URL) + "/api/commands?device_id=" + DEVICE_ID);
+
+  const int httpCode = http.GET();
+  bool falseAlarm = false;
+  if (httpCode == 200) {
+    // GET /api/commands returns the undelivered command queue as JSON and
+    // marks it delivered. A plain substring check avoids pulling in a JSON
+    // library for a single field; revisit if the response shape grows.
+    const String body = http.getString();
+    falseAlarm = body.indexOf("siren_off") != -1;
+  }
+  http.end();
+
+  return falseAlarm;
+}

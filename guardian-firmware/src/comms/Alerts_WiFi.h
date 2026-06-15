@@ -6,4 +6,5 @@ class AlertsWiFi : public Alerts {
  public:
   bool begin() override;
   bool sendEvent(const Event& evt) override;
+  bool checkFalseAlarm() override;
 };

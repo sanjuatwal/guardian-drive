@@ -10,6 +10,7 @@
 #include "core/AuthorizedModes.h"
 #include "actuators/Siren_Buzzer.h"
 #include "sensors/ProximityChecker_Stub.h"
+#include "comms/Alerts_WiFi.h"
 
 IMUSensorMPU6050 imu;
 EventLogger eventLogger;
@@ -18,6 +19,7 @@ SirenBuzzer siren;
 ThreatResponse threatResponse(siren);
 AuthorizedModes authorizedModes;
 ProximityCheckerStub proximityChecker;
+AlertsWiFi alerts;
 
 namespace {
 constexpr int kBaselineSampleCount = 50;
@@ -25,6 +27,7 @@ constexpr float kTiltAlertThresholdDeg = 8.0f;
 constexpr int kTiltAlertConsecutiveSamples = 3;
 constexpr float kImpactThresholdG = 0.5f;
 constexpr unsigned long kImpactCooldownMs = 1000;
+constexpr unsigned long kFalseAlarmPollIntervalMs = 3000;
 }
 
 int baselineSamples = 0;
@@ -37,6 +40,7 @@ int tiltBreachCount = 0;
 bool tiltAlertActive = false;
 bool imuOnline = false;
 unsigned long lastImpactMs = 0;
+unsigned long lastFalseAlarmPollMs = 0;
 
 void resetBaseline() {
   baselineSamples = 0;
@@ -50,32 +54,47 @@ void resetBaseline() {
   Serial.println("Baseline reset: recalibrating...");
 }
 
-// Section 9: tilt while owner/key tag is nearby and no authorized mode is
-// active is not yet theft, but the system can't tell whether it's expected
-// (towing, jacking, service) without the owner's input. Prompt them.
-void checkTiltModeAdvice() {
+// Section 9 + Section 12: with no authorized mode active, a suspicious tilt
+// is resolved against the phone/Key Tag truth table:
+//  - owner/key present  -> not theft, but ambiguous (towing/jacking/service)
+//                           -> prompt owner to enable Tow/Service mode
+//  - owner/key absent    -> no phone, no key tag, suspicious movement
+//                           -> Layer 1 automatic THEFT_MODE, siren fires now
+void evaluateTiltEscalation() {
   if (authorizedModes.isAnyModeActive()) {
-    Serial.println("INFO: tilt detected during an authorized mode (service/valet/tow) — no advice needed.");
+    Serial.println("INFO: tilt detected during an authorized mode (service/valet/tow) — suppressed.");
     return;
   }
 
   const bool ownerPresent = proximityChecker.ownerPhoneNearby() || proximityChecker.keyTagNearby();
-  if (!ownerPresent) {
-    // Owner/key absent — handled by the existing suspicious/theft escalation path.
+  if (ownerPresent) {
+    Event evt;
+    evt.event_id = eventLogger.nextEventId();
+    evt.sensor_type = "tilt_mode_advice";
+    evt.severity = EventSeverity::kInfo;
+    evt.timestamp_ms = millis();
+    evt.payload = "owner_present:true,service_mode:false,valet_mode:false,tow_mode:false";
+
+    eventLogger.log(evt);
+    alerts.sendEvent(evt);
+    Serial.println(
+        "NOTICE: Vehicle tilt detected while you're nearby. If this is expected "
+        "(towing, jacking, service), turn on Tow Approval or Service Mode to avoid a false theft alert.");
     return;
   }
 
+  // No phone, no key tag, no authorized mode + tilt -> THEFT (Section 12).
   Event evt;
   evt.event_id = eventLogger.nextEventId();
-  evt.sensor_type = "tilt_mode_advice";
-  evt.severity = EventSeverity::kInfo;
+  evt.sensor_type = "theft_auto_trigger";
+  evt.severity = EventSeverity::kHigh;
   evt.timestamp_ms = millis();
-  evt.payload = "owner_present:true,service_mode:false,valet_mode:false,tow_mode:false";
+  evt.payload = "reason:tilt,owner_present:false,key_tag_present:false";
 
   eventLogger.log(evt);
-  Serial.println(
-      "NOTICE: Vehicle tilt detected while you're nearby. If this is expected "
-      "(towing, jacking, service), turn on Tow Approval or Service Mode to avoid a false theft alert.");
+  alerts.sendEvent(evt);
+  Serial.println("THEFT: no phone/key tag nearby + tilt detected — triggering Theft Mode automatically.");
+  stateManager.transitionToTheftMode();
 }
 
 void emitTiltEvent(float tiltDelta, float pitchDeg, float rollDeg) {
@@ -92,8 +111,9 @@ void emitTiltEvent(float tiltDelta, float pitchDeg, float rollDeg) {
   evt.payload = payload;
 
   eventLogger.log(evt);
+  alerts.sendEvent(evt);
   stateManager.transitionToSuspicious();
-  checkTiltModeAdvice();
+  evaluateTiltEscalation();
 }
 
 bool readImu(IMUReading& out) {
@@ -114,10 +134,31 @@ void emitImpactEvent(float magnitudeG, float deltaG) {
   evt.payload = payload;
 
   eventLogger.log(evt);
+  alerts.sendEvent(evt);
   Serial.printf(
       "DAMAGE ALERT: impact detected (magnitude=%.2fg, delta=%.2fg). "
       "Not theft unless followed by door/start/move.\n",
       magnitudeG, deltaG);
+}
+
+// Section 3: "If the owner taps 'It's me — Not a theft' ... siren stops
+// immediately." The app posts a "siren_off" command; we poll for it while
+// not in kNormal and return to kNormal (ThreatResponse silences the siren).
+void checkFalseAlarmCommand() {
+  if (stateManager.currentState() == DeviceState::kNormal) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now - lastFalseAlarmPollMs < kFalseAlarmPollIntervalMs) {
+    return;
+  }
+  lastFalseAlarmPollMs = now;
+
+  if (alerts.checkFalseAlarm()) {
+    Serial.println("APP: False alarm received — silencing siren, returning to NORMAL.");
+    stateManager.transitionToNormal();
+  }
 }
 
 void scanI2C() {
@@ -263,9 +304,11 @@ void setup() {
 
   threatResponse.begin();
   proximityChecker.begin();
+  alerts.begin();
   Serial.println("Siren bench commands: 'c'=theft candidate (chirp), 't'=theft mode (siren), 'n'=normal (silence)");
   Serial.println("Mode bench commands: 's'=toggle service mode, 'v'=toggle valet mode, 'w'=toggle tow mode");
   Serial.println("Proximity bench commands: 'p'=toggle simulated phone nearby, 'k'=toggle simulated key tag nearby");
+  Serial.println("Defaults: phone/key tag NOT nearby — suspicious tilt auto-triggers Theft Mode (Section 12)");
 
   scanI2C();
 
@@ -280,6 +323,7 @@ void setup() {
 void loop() {
   handleSerialCommands();
   threatResponse.update(stateManager.currentState());
+  checkFalseAlarmCommand();
 
   if (!imuOnline) {
     // Keep retrying so wiring fixes can be checked live without reflashing.
