@@ -1,5 +1,12 @@
 # Dependencies
 node_modules/
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/guardian.db
+
+# Firmware secrets
+guardian-firmware/src/config.h
 
 # PlatformIO build artifacts
 .pio/
