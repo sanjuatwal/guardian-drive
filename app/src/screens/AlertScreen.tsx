@@ -1,10 +1,51 @@
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Animated, Easing, Image } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
-import { colors, radius, spacing, motion } from '../../theme/tokens';
+import { confirmAlert, dismissAlert } from '../api/client';
+import { colors, fonts, gradients, motion, radius, spacing } from '../../theme/tokens';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { useAppState } from '../state/AppStateContext';
+
+const fallbackReasons = [
+  'Movement while parked',
+  'Key tag not nearby',
+  'System escalated to critical alert',
+];
 
 export function AlertScreen() {
-  const pulseAnim = useRef(new Animated.Value(0.9)).current;
+  const navigation = useNavigation();
+  const { state, refresh } = useAppState();
+  const [busy, setBusy] = useState(false);
+  const alert = state.currentAlert;
+  const reasons = alert?.reasons.length ? alert.reasons : fallbackReasons;
+
+  const resolve = async (action: 'confirm' | 'dismiss') => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (alert?.id) {
+        if (action === 'confirm') {
+          await confirmAlert(alert.id);
+        } else {
+          await dismissAlert(alert.id);
+        }
+        await refresh();
+      }
+      // AlertWatcher closes the modal once the alert clears from state, but
+      // fall back to manual dismiss when running on mock data.
+      if (!alert?.id && navigation.canGoBack()) {
+        navigation.goBack();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(
@@ -12,199 +53,209 @@ export function AlertScreen() {
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: motion.alertPulseMs / 2,
-          easing: Easing.ease,
-          useNativeDriver: false,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.9,
+          toValue: 0,
           duration: motion.alertPulseMs / 2,
-          easing: Easing.ease,
-          useNativeDriver: false,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [pulseAnim]);
 
-  const pulseScale = pulseAnim.interpolate({
-    inputRange: [0.9, 1],
-    outputRange: [1, 1.02],
-  });
+  const ringScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const ringOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.08] });
+
   return (
-    <View style={styles.screen}>
-      <View style={styles.headerRow}>
-        <View style={styles.logoFrame}>
-          <Image source={require('../../theme/assets/brand-logo.png')} style={styles.logoImage} resizeMode="contain" />
+    <Screen>
+      <ScreenHeader />
+
+      <View style={styles.body}>
+        <View style={styles.iconStack}>
+          <Animated.View
+            style={[styles.pulseRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
+          />
+          <View style={styles.iconFrame}>
+            <Ionicons name="warning" size={44} color={colors.redAlert} />
+          </View>
         </View>
+
+        <Text style={styles.title}>{alert?.title ?? 'Possible Vehicle Theft'}</Text>
+        <Text style={styles.subtitle}>
+          We&apos;ve detected unusual activity that suggests your vehicle may be at risk.
+        </Text>
+
+        <LinearGradient
+          colors={gradients.dangerGlow}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.reasonGradient}
+        >
+          <View style={styles.reasonCard}>
+            <Text style={styles.reasonHeading}>Why this alert?</Text>
+            {reasons.map((reason) => (
+              <View key={reason} style={styles.reasonRow}>
+                <View style={styles.reasonIconFrame}>
+                  <Ionicons name="alert-circle" size={15} color={colors.redAlert} />
+                </View>
+                <Text style={styles.reasonText}>{reason}</Text>
+              </View>
+            ))}
+          </View>
+        </LinearGradient>
       </View>
 
-      {/* Danger Pulse Glow Background */}
-      <Animated.View
-        style={[
-          styles.dangerGlowPulse,
-          { transform: [{ scale: pulseScale }] },
-        ]}
-      />
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.primaryButton, busy && styles.buttonDisabled]}
+          activeOpacity={0.85}
+          disabled={busy}
+          onPress={() => resolve('confirm')}
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+          <Text style={styles.primaryText}>{busy ? 'Working…' : 'Confirm Theft'}</Text>
+        </TouchableOpacity>
 
-      {/* Alert Card with Red Glow */}
-      <Animated.View
-        style={[
-          styles.alertCard,
-          { transform: [{ scale: pulseScale }] },
-        ]}
-      >
-        <View style={styles.alertHeader}>
-          <Text style={styles.alertIcon}>⚠️</Text>
-          <Text style={styles.alertTitle}>Possible Vehicle Theft</Text>
-        </View>
-        <Text style={styles.alertBody}>Unusual movement detected. Ignition activity does not match an authorized session.</Text>
-        <View style={styles.reasonList}>
-          <Text style={styles.reasonItem}>• Movement while parked</Text>
-          <Text style={styles.reasonItem}>• Key tag not nearby</Text>
-          <Text style={styles.reasonItem}>• System escalated to critical alert</Text>
-        </View>
-        <View style={styles.countdownContainer}>
-          <Text style={styles.countdownLabel}>Automatic response in:</Text>
-          <Text style={styles.countdownValue}>0:45</Text>
-        </View>
-      </Animated.View>
+        <TouchableOpacity
+          style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+          activeOpacity={0.85}
+          disabled={busy}
+          onPress={() => resolve('dismiss')}
+        >
+          <Text style={styles.secondaryText}>It&apos;s Me — False Alarm</Text>
+        </TouchableOpacity>
 
-      {/* Action Buttons */}
-      <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85}>
-        <Text style={styles.primaryIcon}>✓</Text>
-        <Text style={styles.primaryText}>Confirm Theft</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.85}>
-        <Text style={styles.secondaryText}>It's Me — False Alarm</Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.autoConfirmText}>Alert will auto-confirm in 30s</Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  body: {
     flex: 1,
-    backgroundColor: colors.deepBlack,
-    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.lg,
   },
-  headerRow: {
-    alignItems: 'flex-start',
-    marginTop: spacing.sm,
+  iconStack: {
+    width: 140,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
-  logoFrame: {
-    width: 220,
-    height: 48,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  dangerGlowPulse: {
+  pulseRing: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: colors.redAlert,
-    opacity: 0.08,
-    marginLeft: -150,
-    marginTop: -150,
   },
-  alertCard: {
+  iconFrame: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: colors.graphite,
-    borderColor: colors.redAlert,
+    borderColor: colors.redBorder,
     borderWidth: 2,
-    borderRadius: radius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    color: colors.redAlert,
+    fontSize: 26,
+    fontFamily: fonts.black,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    lineHeight: 21,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  reasonGradient: {
+    alignSelf: 'stretch',
+    borderRadius: radius.lg,
+    padding: 1,
+  },
+  reasonCard: {
+    backgroundColor: colors.graphite,
+    borderRadius: radius.lg - 1,
     padding: spacing.lg,
     gap: spacing.md,
-    zIndex: 10,
   },
-  alertHeader: {
+  reasonHeading: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  reasonRow: {
     flexDirection: 'row',
-    gap: spacing.md,
     alignItems: 'center',
-  },
-  alertIcon: {
-    fontSize: 32,
-  },
-  alertTitle: {
-    color: colors.redAlert,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    flex: 1,
-  },
-  alertBody: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  reasonList: {
     gap: spacing.sm,
   },
-  reasonItem: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  countdownContainer: {
-    backgroundColor: colors.carbon,
-    borderColor: colors.redAlert,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
+  reasonIconFrame: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.redSoft,
     alignItems: 'center',
-    gap: spacing.xs,
+    justifyContent: 'center',
   },
-  countdownLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    letterSpacing: 0.2,
+  reasonText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    flex: 1,
   },
-  countdownValue: {
-    color: colors.redAlert,
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  actions: {
+    gap: spacing.md,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   primaryButton: {
-    backgroundColor: colors.redAlert,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    flexDirection: 'row',
-    zIndex: 10,
-  },
-  primaryIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
+    backgroundColor: colors.redAlert,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
   },
   primaryText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: 0.3,
   },
   secondaryButton: {
-    borderWidth: 2,
-    borderColor: colors.cardBorder,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     backgroundColor: colors.carbon,
-    zIndex: 10,
+    borderColor: colors.cardBorder,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
   },
   secondaryText: {
     color: colors.textPrimary,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
     letterSpacing: 0.2,
+  },
+  autoConfirmText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    textAlign: 'center',
   },
 });

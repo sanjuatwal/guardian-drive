@@ -1,59 +1,92 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { colors, radius, spacing } from '../../theme/tokens';
+import { colors, fonts, radius, spacing } from '../../theme/tokens';
+import { Card, SectionLabel } from '../components/Card';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { useAppState } from '../state/AppStateContext';
+
+type IoniconName = keyof typeof Ionicons.glyphMap;
+
+type SettingRowProps = {
+  icon: IoniconName;
+  label: string;
+  value?: string;
+};
+
+function SettingRow({ icon, label, value }: SettingRowProps) {
+  return (
+    <TouchableOpacity style={styles.row} activeOpacity={0.7}>
+      <View style={styles.rowIconFrame}>
+        <Ionicons name={icon} size={18} color={colors.cyan} />
+      </View>
+      <Text style={styles.rowLabel}>{label}</Text>
+      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
 
 export function SettingsScreen() {
+  const { state } = useAppState();
+  const privacyLabel = state.privacyMode.charAt(0).toUpperCase() + state.privacyMode.slice(1);
+
   return (
-    <View style={styles.screen}>
-      <View style={styles.headerRow}>
-        <View style={styles.logoFrame}>
-          <Image source={require('../../theme/assets/brand-logo.png')} style={styles.logoImage} resizeMode="contain" />
-        </View>
-      </View>
-      <Text style={styles.title}>Settings</Text>
-      <View style={styles.card}>
-        <Text style={styles.item}>Privacy</Text>
-        <Text style={styles.item}>Emergency Contacts</Text>
-        <Text style={styles.item}>Notification Preferences</Text>
-        <Text style={styles.item}>Biometric Confirmation</Text>
-      </View>
-    </View>
+    <Screen scroll>
+      <ScreenHeader title="Settings" subtitle="Privacy, alerts, and account" />
+
+      <SectionLabel>Security</SectionLabel>
+      <Card style={styles.listCard}>
+        <SettingRow icon="eye-off-outline" label="Privacy" value={privacyLabel} />
+        <View style={styles.divider} />
+        <SettingRow icon="finger-print-outline" label="Biometric Confirmation" value="On" />
+      </Card>
+
+      <SectionLabel>Notifications</SectionLabel>
+      <Card style={styles.listCard}>
+        <SettingRow icon="call-outline" label="Emergency Contacts" />
+        <View style={styles.divider} />
+        <SettingRow icon="notifications-outline" label="Notification Preferences" />
+      </Card>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.deepBlack,
-    padding: spacing.lg,
-    gap: spacing.lg,
+  listCard: {
+    padding: spacing.sm,
+    gap: 0,
   },
-  headerRow: {
-    alignItems: 'flex-start',
-  },
-  logoFrame: {
-    width: 220,
-    height: 48,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 24,
-  },
-  card: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.graphite,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
+    padding: spacing.md,
   },
-  item: {
+  rowIconFrame: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: colors.cyanSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: {
+    flex: 1,
     color: colors.textPrimary,
     fontSize: 14,
+    fontFamily: fonts.medium,
+  },
+  rowValue: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.cardBorder,
+    marginLeft: spacing.md + 36 + spacing.md,
   },
 });

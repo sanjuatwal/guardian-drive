@@ -24,6 +24,7 @@ export type ActivityEvent = {
 };
 
 export type AlertSummary = {
+  id?: string;
   title: string;
   reasons: string[];
   countdownLabel?: string;
