@@ -23,6 +23,9 @@ alertsRouter.post('/:id/confirm', (req, res) => {
   db.prepare(`UPDATE alerts SET status = 'confirmed', resolved_at = ? WHERE id = ?`).run(now, alert.id);
   db.prepare(`UPDATE devices SET status = 'recovery' WHERE id = ?`).run(alert.device_id);
 
+  // Keep the siren going (or force it on if the device was in a non-theft state).
+  queueCommand(alert.device_id, 'siren_on');
+
   const evidence = lockEvidence({ ...alert, status: 'confirmed', resolved_at: now });
 
   broadcast(alert.device_id, { type: 'alert_confirmed', alertId: alert.id });

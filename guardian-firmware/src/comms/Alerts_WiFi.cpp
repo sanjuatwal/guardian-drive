@@ -65,12 +65,19 @@ bool AlertsWiFi::checkFalseAlarm() {
   bool falseAlarm = false;
   if (httpCode == 200) {
     // GET /api/commands returns the undelivered command queue as JSON and
-    // marks it delivered. A plain substring check avoids pulling in a JSON
-    // library for a single field; revisit if the response shape grows.
+    // marks it delivered. Parse both commands in one call so a second HTTP
+    // request doesn't race against the already-consumed queue.
     const String body = http.getString();
     falseAlarm = body.indexOf("siren_off") != -1;
+    pendingSirenTrigger_ = body.indexOf("siren_on") != -1;
   }
   http.end();
 
   return falseAlarm;
+}
+
+bool AlertsWiFi::checkSirenTrigger() {
+  const bool result = pendingSirenTrigger_;
+  pendingSirenTrigger_ = false;
+  return result;
 }

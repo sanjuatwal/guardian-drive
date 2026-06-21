@@ -7,4 +7,8 @@ class AlertsWiFi : public Alerts {
   bool begin() override;
   bool sendEvent(const Event& evt) override;
   bool checkFalseAlarm() override;
+  bool checkSirenTrigger() override;
+
+ private:
+  bool pendingSirenTrigger_ = false;
 };

@@ -143,23 +143,26 @@ void emitImpactEvent(float magnitudeG, float deltaG) {
       magnitudeG, deltaG);
 }
 
-// Section 3: "If the owner taps 'It's me — Not a theft' ... siren stops
-// immediately." The app posts a "siren_off" command; we poll for it while
-// not in kNormal and return to kNormal (ThreatResponse silences the siren).
-void checkFalseAlarmCommand() {
-  if (stateManager.currentState() == DeviceState::kNormal) {
-    return;
-  }
-
+// Poll the backend command queue for siren_off (false alarm) and siren_on
+// (remote trigger from app). Both are parsed from one HTTP call inside
+// checkFalseAlarm() so neither consumes the other's queued command.
+void checkRemoteCommands() {
   const unsigned long now = millis();
   if (now - lastFalseAlarmPollMs < kFalseAlarmPollIntervalMs) {
     return;
   }
   lastFalseAlarmPollMs = now;
 
-  if (alerts.checkFalseAlarm()) {
-    Serial.println("APP: False alarm received — silencing siren, returning to NORMAL.");
+  const bool falseAlarm = alerts.checkFalseAlarm();
+  const bool sirenTrigger = alerts.checkSirenTrigger();
+
+  if (falseAlarm && stateManager.currentState() != DeviceState::kNormal) {
+    Serial.println("APP: False alarm — silencing siren, returning to NORMAL.");
     stateManager.transitionToNormal();
+  }
+  if (sirenTrigger && stateManager.currentState() != DeviceState::kTheftMode) {
+    Serial.println("APP: Remote siren trigger — entering THEFT_MODE.");
+    stateManager.transitionToTheftMode();
   }
 }
 
@@ -318,7 +321,10 @@ void processReading(const IMUReading& r) {
         tiltDelta,
         kTiltAlertThresholdDeg,
         tiltBreachCount);
-    emitTiltEvent(tiltDelta, r.pitchDeg, r.rollDeg);
+    // Don't re-emit if theft mode is already active — one alert is enough.
+    if (stateManager.currentState() != DeviceState::kTheftMode) {
+      emitTiltEvent(tiltDelta, r.pitchDeg, r.rollDeg);
+    }
   }
 }
 
@@ -348,7 +354,7 @@ void setup() {
 void loop() {
   handleSerialCommands();
   threatResponse.update(stateManager.currentState());
-  checkFalseAlarmCommand();
+  checkRemoteCommands();
 
   if (!imuOnline) {
     // Keep retrying so wiring fixes can be checked live without reflashing.

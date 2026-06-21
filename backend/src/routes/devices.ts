@@ -7,6 +7,7 @@ import { db } from '../db';
 import { getActiveAlert, getDevice, getRecentEvents, ingestEvent } from '../eventIngest';
 import { broadcast } from '../live';
 import { toActivityEvent, toAppState } from '../presenter';
+import { queueCommand } from './commands';
 import { DeviceRow, SensorEventType } from '../types';
 
 export const devicesRouter = Router();
@@ -103,6 +104,13 @@ devicesRouter.post('/:id/events', (req, res) => {
   });
 
   return res.status(201).json(result);
+});
+
+devicesRouter.post('/:id/commands/siren', (req, res) => {
+  const device = requireDevice(req.params.id);
+  if (!device) return res.status(404).json({ error: 'device not found' });
+  queueCommand(device.id, 'siren_on');
+  return res.json({ ok: true });
 });
 
 devicesRouter.patch('/:id/settings', (req, res) => {
