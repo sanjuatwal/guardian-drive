@@ -16,6 +16,7 @@ export type ProximityStatus =
   | 'scanning'
   | 'connecting'
   | 'connected'
+  | 'simulated-away'
   | 'error';
 
 export type ProximityState = {
@@ -57,7 +58,8 @@ async function ensureAndroidPermissions(): Promise<boolean> {
 // owner auth token. A live connection == phone nearby (Section 12). The car
 // unit advertises and the phone scans because iOS background scanning is
 // reliable while iOS background advertising is not.
-export function useProximity(): ProximityState {
+export function useProximity(options?: { disabled?: boolean }): ProximityState {
+  const disabled = options?.disabled ?? false;
   const [state, setState] = useState<ProximityState>({
     status: 'idle',
     carUnitConnected: false,
@@ -68,6 +70,10 @@ export function useProximity(): ProximityState {
   // Latest-wins guards so async callbacks from a torn-down effect are ignored.
   const disposedRef = useRef(false);
   const rssiTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectedDeviceIdRef = useRef<string | null>(null);
+  // Set to true before a deliberate cancelDeviceConnection so the onDisconnected
+  // callback knows not to kick off startScan() (which would immediately reconnect).
+  const intentionalDisconnectRef = useRef(false);
 
   useEffect(() => {
     disposedRef.current = false;
@@ -76,6 +82,22 @@ export function useProximity(): ProximityState {
     const patch = (next: Partial<ProximityState>) => {
       if (!disposedRef.current) setState((prev) => ({ ...prev, ...next }));
     };
+
+    // Testing switch: drop any live link and stop scanning so the car unit
+    // sees the owner phone as AWAY without physically moving the phone.
+    if (disabled) {
+      manager.stopDeviceScan();
+      if (rssiTimerRef.current) clearInterval(rssiTimerRef.current);
+      if (connectedDeviceIdRef.current) {
+        intentionalDisconnectRef.current = true;
+        manager.cancelDeviceConnection(connectedDeviceIdRef.current).catch(() => {});
+        connectedDeviceIdRef.current = null;
+      }
+      setState({ status: 'simulated-away', carUnitConnected: false, rssi: null, error: null });
+      return () => {
+        disposedRef.current = true;
+      };
+    }
 
     const startScan = () => {
       patch({ status: 'scanning', carUnitConnected: false, rssi: null });
@@ -106,6 +128,7 @@ export function useProximity(): ProximityState {
         );
 
         if (disposedRef.current) return;
+        connectedDeviceIdRef.current = connected.id;
         patch({ status: 'connected', carUnitConnected: true, error: null });
 
         rssiTimerRef.current = setInterval(async () => {
@@ -119,9 +142,13 @@ export function useProximity(): ProximityState {
 
         connected.onDisconnected(() => {
           if (rssiTimerRef.current) clearInterval(rssiTimerRef.current);
+          connectedDeviceIdRef.current = null;
+          // If we intentionally canceled the connection (sim toggle), don't reconnect.
+          if (intentionalDisconnectRef.current) {
+            intentionalDisconnectRef.current = false;
+            return;
+          }
           if (disposedRef.current) return;
-          // Phone moved out of range / link dropped — go back to scanning so
-          // we reconnect automatically when it returns.
           startScan();
         });
       } catch (e) {
@@ -156,7 +183,7 @@ export function useProximity(): ProximityState {
       if (rssiTimerRef.current) clearInterval(rssiTimerRef.current);
       manager.stopDeviceScan();
     };
-  }, []);
+  }, [disabled]);
 
   return state;
 }

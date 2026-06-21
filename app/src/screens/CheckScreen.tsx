@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, spacing } from '../../theme/tokens';
@@ -40,6 +40,8 @@ function proximitySubtitle(status: ProximityStatus, rssi: number | null): string
       return 'Searching for vehicle…';
     case 'connecting':
       return 'Linking to vehicle…';
+    case 'simulated-away':
+      return 'Simulated out of range (testing)';
     case 'bluetooth-off':
       return 'Turn on Bluetooth to detect proximity';
     case 'permission-denied':
@@ -53,7 +55,8 @@ function proximitySubtitle(status: ProximityStatus, rssi: number | null): string
 
 export function CheckScreen() {
   const device = useDeviceSummary();
-  const proximity = useProximity();
+  const [simOutOfRange, setSimOutOfRange] = React.useState(false);
+  const proximity = useProximity({ disabled: simOutOfRange });
 
   const rows: CheckRowProps[] = [
     { icon: 'heart-outline', label: 'Device Health', subtitle: 'All systems operational' },
@@ -81,6 +84,26 @@ export function CheckScreen() {
           </View>
         ))}
       </Card>
+
+      <Card style={styles.listCard}>
+        <View style={styles.simRow}>
+          <View style={styles.rowIconFrame}>
+            <Ionicons name="flask-outline" size={18} color={colors.cyan} />
+          </View>
+          <View style={styles.simTextBlock}>
+            <Text style={styles.rowLabel}>Simulate Phone Out of Range</Text>
+            <Text style={styles.rowSubtitle}>
+              Drops the BLE link so the car unit treats you as away — for testing theft alerts.
+            </Text>
+          </View>
+          <Switch
+            value={simOutOfRange}
+            onValueChange={setSimOutOfRange}
+            trackColor={{ false: colors.cardBorder, true: colors.cyan }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+      </Card>
     </Screen>
   );
 }
@@ -105,6 +128,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowTextBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  simRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  simTextBlock: {
     flex: 1,
     gap: 2,
   },
