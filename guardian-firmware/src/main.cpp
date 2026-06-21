@@ -24,7 +24,9 @@ AlertsWiFi alerts;
 namespace {
 constexpr int kBaselineSampleCount = 50;
 constexpr float kTiltAlertThresholdDeg = 8.0f;
+constexpr float kTiltReleaseThresholdDeg = 5.0f;  // dead-band floor: below this, fully reset
 constexpr int kTiltAlertConsecutiveSamples = 3;
+constexpr float kBaselineStableMagnitudeToleranceG = 0.05f;  // only calibrate while at rest
 constexpr float kImpactThresholdG = 0.5f;
 constexpr unsigned long kImpactCooldownMs = 1000;
 constexpr unsigned long kFalseAlarmPollIntervalMs = 3000;
@@ -241,6 +243,19 @@ void processReading(const IMUReading& r) {
   }
 
   if (!baselineReady) {
+    // Only count this sample toward the baseline if the device is actually
+    // at rest — otherwise handling/positioning during calibration bakes a
+    // skewed zero-point into the baseline (root cause of inconsistent
+    // tilt triggers across reboots).
+    if (accelMagnitudeDelta > kBaselineStableMagnitudeToleranceG) {
+      Serial.printf(
+          "Calibrating baseline... device not stable (accel delta=%.3fg), sample discarded | pitch=%.2f roll=%.2f\n",
+          accelMagnitudeDelta,
+          r.pitchDeg,
+          r.rollDeg);
+      return;
+    }
+
     baselinePitchSum += r.pitchDeg;
     baselineRollSum += r.rollDeg;
     baselineSamples++;
@@ -270,21 +285,31 @@ void processReading(const IMUReading& r) {
   const float rollDelta = fabsf(r.rollDeg - baselineRollDeg);
   const float tiltDelta = (pitchDelta > rollDelta) ? pitchDelta : rollDelta;
 
+  // Three-way hysteresis: a single noisy dip back under the alert threshold
+  // should not wipe out progress toward the consecutive-sample requirement.
+  // Only a clear return below the release threshold counts as "back to normal".
+  const char* zone;
+  if (tiltDelta > kTiltAlertThresholdDeg) {
+    tiltBreachCount++;
+    zone = "ALERT";
+  } else if (tiltDelta > kTiltReleaseThresholdDeg) {
+    zone = "HOLD";
+  } else {
+    tiltBreachCount = 0;
+    tiltAlertActive = false;
+    zone = "RESET";
+  }
+
   Serial.printf(
-      "ACC[g] ax=%.3f ay=%.3f az=%.3f | tilt pitch=%.2f roll=%.2f | delta=%.2f\n",
+      "ACC[g] ax=%.3f ay=%.3f az=%.3f | tilt pitch=%.2f roll=%.2f | delta=%.2f zone=%s breachCount=%d\n",
       r.ax,
       r.ay,
       r.az,
       r.pitchDeg,
       r.rollDeg,
-      tiltDelta);
-
-  if (tiltDelta > kTiltAlertThresholdDeg) {
-    tiltBreachCount++;
-  } else {
-    tiltBreachCount = 0;
-    tiltAlertActive = false;
-  }
+      tiltDelta,
+      zone,
+      tiltBreachCount);
 
   if (!tiltAlertActive && tiltBreachCount >= kTiltAlertConsecutiveSamples) {
     tiltAlertActive = true;

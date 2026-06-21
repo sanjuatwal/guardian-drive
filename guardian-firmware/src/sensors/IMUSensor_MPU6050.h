@@ -17,4 +17,9 @@ class IMUSensorMPU6050 : public IMUSensor {
   bool readRegs(uint8_t startReg, uint8_t* buffer, size_t len);
 
   uint8_t addr_;
+
+  // EMA-filtered tilt angles (raw ax/ay/az stay unfiltered for impact detection).
+  float filteredPitchDeg_ = 0.0f;
+  float filteredRollDeg_ = 0.0f;
+  bool filterInitialized_ = false;
 };
