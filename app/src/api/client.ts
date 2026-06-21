@@ -44,3 +44,7 @@ export function dismissAlert(alertId: string): Promise<{ ok: boolean }> {
 export function triggerSiren(): Promise<{ ok: boolean }> {
   return request(`/api/v1/devices/${DEVICE_ID}/commands/siren`, { method: 'POST' });
 }
+
+export function stopSiren(): Promise<{ ok: boolean }> {
+  return request(`/api/v1/devices/${DEVICE_ID}/commands/siren`, { method: 'DELETE' });
+}
