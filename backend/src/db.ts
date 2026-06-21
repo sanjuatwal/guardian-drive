@@ -24,6 +24,7 @@ db.exec(`
     location_label  TEXT,
     privacy_mode    TEXT NOT NULL DEFAULT 'balanced',
     service_mode    INTEGER NOT NULL DEFAULT 0,
+    maintenance_mode TEXT NOT NULL DEFAULT 'off',
     last_seen_at    INTEGER
   );
 
@@ -64,3 +65,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_commands_device ON commands(device_id, delivered_at);
 `);
+
+// Migration: maintenance_mode ('off' | 'service' | 'valet' | 'towing')
+// supersedes the older service_mode boolean for databases created before it.
+const deviceColumns = db.prepare(`PRAGMA table_info(devices)`).all() as { name: string }[];
+if (!deviceColumns.some((column) => column.name === 'maintenance_mode')) {
+  db.exec(`ALTER TABLE devices ADD COLUMN maintenance_mode TEXT NOT NULL DEFAULT 'off'`);
+  // Carry over any device that was left in the legacy service_mode boolean.
+  db.exec(`UPDATE devices SET maintenance_mode = 'service' WHERE service_mode = 1`);
+}

@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-import { MockAppState } from '../types/app';
+import { MaintenanceMode, MockAppState } from '../types/app';
 
 export const DEVICE_ID = 'demo-device';
 const BACKEND_PORT = 4000;
@@ -47,4 +47,11 @@ export function triggerSiren(): Promise<{ ok: boolean }> {
 
 export function stopSiren(): Promise<{ ok: boolean }> {
   return request(`/api/v1/devices/${DEVICE_ID}/commands/siren`, { method: 'DELETE' });
+}
+
+export function setMaintenanceMode(mode: MaintenanceMode): Promise<{ ok: boolean }> {
+  return request(`/api/v1/devices/${DEVICE_ID}/settings`, {
+    method: 'PATCH',
+    body: JSON.stringify({ maintenanceMode: mode }),
+  });
 }

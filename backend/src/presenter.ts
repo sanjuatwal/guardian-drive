@@ -1,4 +1,4 @@
-import { eventTitle } from './riskEngine';
+import { eventTitle, MAINTENANCE_LABELS } from './riskEngine';
 import { ActivityEvent, AlertRow, AppState, DeviceRow, DeviceSummary, EventRow } from './types';
 
 const STATUS_LABELS: Record<DeviceRow['status'], string> = {
@@ -32,7 +32,8 @@ export function toDeviceSummary(device: DeviceRow, now = Date.now()): DeviceSumm
     backupBattery: `${device.battery_pct}%`,
     keyTagStatus: device.key_tag_present ? 'Nearby' : 'Not Detected',
     locationLabel: device.location_label ?? 'Unknown',
-    serviceModeLabel: device.service_mode ? 'On' : 'Off',
+    maintenanceMode: device.maintenance_mode,
+    maintenanceModeLabel: MAINTENANCE_LABELS[device.maintenance_mode],
   };
 }
 

@@ -109,6 +109,10 @@ devicesRouter.post('/:id/events', (req, res) => {
 devicesRouter.post('/:id/commands/siren', (req, res) => {
   const device = requireDevice(req.params.id);
   if (!device) return res.status(404).json({ error: 'device not found' });
+  // The siren is suppressed while any maintenance mode is active.
+  if (device.maintenance_mode !== 'off') {
+    return res.status(409).json({ error: `siren disabled while ${device.maintenance_mode} mode is active` });
+  }
   queueCommand(device.id, 'siren_on');
   return res.json({ ok: true });
 });
@@ -126,32 +130,40 @@ devicesRouter.patch('/:id/settings', (req, res) => {
 
   const schema = z.object({
     privacyMode: z.enum(['private', 'balanced', 'recovery', 'always-on']).optional(),
-    serviceMode: z.boolean().optional(),
+    maintenanceMode: z.enum(['off', 'service', 'valet', 'towing']).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  const maintenanceMode = parsed.data.maintenanceMode ?? null;
+
   db.prepare(
     `UPDATE devices SET
        privacy_mode = COALESCE(?, privacy_mode),
-       service_mode = COALESCE(?, service_mode),
+       maintenance_mode = COALESCE(?, maintenance_mode),
        status = CASE
-         WHEN ? IS NOT NULL AND ? = 1 THEN 'service'
-         WHEN ? IS NOT NULL AND ? = 0 AND status = 'service' THEN 'protected'
+         WHEN ? IS NOT NULL AND ? != 'off' THEN 'service'
+         WHEN ? IS NOT NULL AND ? = 'off' AND status = 'service' THEN 'protected'
          ELSE status
        END
      WHERE id = ?`,
   ).run(
     parsed.data.privacyMode ?? null,
-    parsed.data.serviceMode === undefined ? null : Number(parsed.data.serviceMode),
-    parsed.data.serviceMode === undefined ? null : 1,
-    parsed.data.serviceMode === undefined ? null : Number(parsed.data.serviceMode),
-    parsed.data.serviceMode === undefined ? null : 1,
-    parsed.data.serviceMode === undefined ? null : Number(parsed.data.serviceMode),
+    maintenanceMode,
+    maintenanceMode,
+    maintenanceMode,
+    maintenanceMode,
+    maintenanceMode,
     device.id,
   );
+
+  // Leaving maintenance mode clears any stale siren the firmware might still
+  // be holding; entering it makes sure the siren is silenced too.
+  if (maintenanceMode !== null) {
+    queueCommand(device.id, 'siren_off');
+  }
 
   broadcast(device.id, { type: 'settings' });
   return res.json({ ok: true });

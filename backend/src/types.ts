@@ -1,6 +1,7 @@
 // Mirrors app/src/types/app.ts so the app can consume /state responses directly.
 export type DeviceStatus = 'protected' | 'service' | 'alert' | 'recovery' | 'offline' | 'degraded';
 export type PrivacyMode = 'private' | 'balanced' | 'recovery' | 'always-on';
+export type MaintenanceMode = 'off' | 'service' | 'valet' | 'towing';
 export type EventSeverity = 'info' | 'warning' | 'critical';
 
 export type SensorEventType =
@@ -32,6 +33,7 @@ export type DeviceRow = {
   location_label: string | null;
   privacy_mode: PrivacyMode;
   service_mode: number;
+  maintenance_mode: MaintenanceMode;
   last_seen_at: number | null;
 };
 
@@ -79,7 +81,8 @@ export type DeviceSummary = {
   backupBattery: string;
   keyTagStatus: string;
   locationLabel: string;
-  serviceModeLabel: string;
+  maintenanceMode: MaintenanceMode;
+  maintenanceModeLabel: string;
 };
 
 export type ActivityEvent = {

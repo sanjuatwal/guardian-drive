@@ -57,7 +57,7 @@ export function CheckScreen() {
 
   const rows: CheckRowProps[] = [
     { icon: 'heart-outline', label: 'Device Health', subtitle: 'All systems operational' },
-    { icon: 'construct-outline', label: 'Service Mode', subtitle: `Manage service settings · ${device.serviceModeLabel}` },
+    { icon: 'construct-outline', label: 'Maintenance Mode', subtitle: `Service · Valet · Towing · ${device.maintenanceModeLabel}` },
     {
       icon: 'bluetooth-outline',
       label: 'Phone Link (BLE)',

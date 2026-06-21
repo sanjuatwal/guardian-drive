@@ -1,5 +1,12 @@
 import { config } from './config';
-import { DeviceRow, EventRow, EventSeverity, SensorEventType } from './types';
+import { DeviceRow, EventRow, EventSeverity, MaintenanceMode, SensorEventType } from './types';
+
+export const MAINTENANCE_LABELS: Record<MaintenanceMode, string> = {
+  off: 'Off',
+  service: 'Service Mode',
+  valet: 'Valet Mode',
+  towing: 'Towing Mode',
+};
 
 // Base suspicion per event type, before context multipliers.
 const BASE_SCORES: Record<SensorEventType, number> = {
@@ -65,9 +72,16 @@ export function assess(
     reasons.push(EVENT_TITLES[type]);
   }
 
-  // Service mode suppresses alerting entirely (mechanic / valet has the car).
-  if (device.service_mode) {
-    return { score: 0, severity: 'info', reasons: ['Service mode active'], shouldAlert: false };
+  // Maintenance mode (service / valet / towing) suppresses alerting and the
+  // siren entirely — someone authorized has the car. The event is still
+  // persisted by ingestEvent, so the activity log keeps a record either way.
+  if (device.maintenance_mode !== 'off') {
+    return {
+      score: 0,
+      severity: 'info',
+      reasons: [`${MAINTENANCE_LABELS[device.maintenance_mode]} active`],
+      shouldAlert: false,
+    };
   }
 
   if (score > 0 && !device.key_tag_present) {

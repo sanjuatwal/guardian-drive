@@ -1,5 +1,6 @@
 export type DeviceStatus = 'protected' | 'service' | 'alert' | 'recovery' | 'offline' | 'degraded';
 export type PrivacyMode = 'private' | 'balanced' | 'recovery' | 'always-on';
+export type MaintenanceMode = 'off' | 'service' | 'valet' | 'towing';
 export type EventSeverity = 'info' | 'warning' | 'critical';
 
 export type DeviceSummary = {
@@ -12,7 +13,8 @@ export type DeviceSummary = {
   backupBattery: string;
   keyTagStatus: string;
   locationLabel: string;
-  serviceModeLabel: string;
+  maintenanceMode: MaintenanceMode;
+  maintenanceModeLabel: string;
 };
 
 export type ActivityEvent = {

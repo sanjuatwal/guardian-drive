@@ -3,20 +3,27 @@ import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-import { stopSiren, triggerSiren } from '../api/client';
+import { setMaintenanceMode, stopSiren, triggerSiren } from '../api/client';
 import { colors, fonts, gradients, radius, spacing } from '../../theme/tokens';
 import { Card, SectionLabel } from '../components/Card';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { useAppState } from '../state/AppStateContext';
+import { MaintenanceMode } from '../types/app';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
 const quickActions: { label: string; icon: IoniconName }[] = [
   { label: 'View Location', icon: 'location-outline' },
-  { label: 'Service Mode', icon: 'construct-outline' },
+  { label: 'Maintenance Mode', icon: 'construct-outline' },
   { label: 'Find Key Tag', icon: 'key-outline' },
   { label: 'Trigger Siren', icon: 'megaphone-outline' },
+];
+
+const maintenanceOptions: { mode: MaintenanceMode; label: string; icon: IoniconName }[] = [
+  { mode: 'service', label: 'Service Mode', icon: 'construct-outline' },
+  { mode: 'valet', label: 'Valet Mode', icon: 'car-sport-outline' },
+  { mode: 'towing', label: 'Towing Mode', icon: 'trail-sign-outline' },
 ];
 
 function LiveBadge({ live }: { live: boolean }) {
@@ -45,10 +52,12 @@ function SummaryChip({ icon, label, value }: { icon: IoniconName; label: string;
 }
 
 export function HomeScreen() {
-  const { state, connection } = useAppState();
+  const { state, connection, refresh } = useAppState();
   const [sirenActive, setSirenActive] = React.useState(false);
   const [sirenSeconds, setSirenSeconds] = React.useState(0);
   const [stopBusy, setStopBusy] = React.useState(false);
+  const [maintenanceModalVisible, setMaintenanceModalVisible] = React.useState(false);
+  const [maintenanceBusy, setMaintenanceBusy] = React.useState(false);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   React.useEffect(() => {
@@ -81,9 +90,21 @@ export function HomeScreen() {
     }
   };
 
+  const applyMaintenance = async (mode: MaintenanceMode) => {
+    if (maintenanceBusy) return;
+    setMaintenanceBusy(true);
+    try {
+      await setMaintenanceMode(mode);
+      await refresh();
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
   const sirenTimeLabel = `${String(Math.floor(sirenSeconds / 60)).padStart(2, '0')}:${String(sirenSeconds % 60).padStart(2, '0')}`;
 
   const device = state.device;
+  const maintenanceActive = device.maintenanceMode !== 'off';
 
   return (
     <Screen scroll>
@@ -146,22 +167,91 @@ export function HomeScreen() {
       <View style={styles.actionsGrid}>
         {quickActions.map((action) => {
           const isSiren = action.label === 'Trigger Siren';
+          const isMaintenance = action.label === 'Maintenance Mode';
+          // The siren is unavailable while a maintenance mode is active.
+          const disabled = isSiren && (sirenActive || maintenanceActive);
+          const onPress = isSiren
+            ? handleTriggerSiren
+            : isMaintenance
+              ? () => setMaintenanceModalVisible(true)
+              : undefined;
           return (
             <TouchableOpacity
               key={action.label}
-              style={[styles.actionCard, isSiren && sirenActive && styles.actionCardDisabled]}
+              style={[
+                styles.actionCard,
+                disabled && styles.actionCardDisabled,
+                isMaintenance && maintenanceActive && styles.actionCardActive,
+              ]}
               activeOpacity={0.7}
-              disabled={isSiren && sirenActive}
-              onPress={isSiren ? handleTriggerSiren : undefined}
+              disabled={disabled}
+              onPress={onPress}
             >
               <View style={styles.actionIconFrame}>
                 <Ionicons name={action.icon} size={20} color={colors.emerald} />
               </View>
-              <Text style={styles.actionLabel}>{action.label}</Text>
+              <Text style={styles.actionLabel}>
+                {isMaintenance && maintenanceActive ? device.maintenanceModeLabel : action.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </View>
+
+      <Modal visible={maintenanceModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.maintenanceCard]}>
+            <View style={styles.maintenanceIconFrame}>
+              <Ionicons name="construct" size={28} color={colors.cyan} />
+            </View>
+            <Text style={styles.modalTitle}>Maintenance Mode</Text>
+            <Text style={styles.modalSubtitle}>
+              Pauses theft alerts and the siren. Location tracking and activity logs stay on.
+            </Text>
+
+            <View style={styles.radioGroup}>
+              {maintenanceOptions.map((option) => {
+                const selected = device.maintenanceMode === option.mode;
+                return (
+                  <TouchableOpacity
+                    key={option.mode}
+                    style={[styles.radioRow, selected && styles.radioRowSelected]}
+                    activeOpacity={0.7}
+                    disabled={maintenanceBusy}
+                    onPress={() => applyMaintenance(selected ? 'off' : option.mode)}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={18}
+                      color={selected ? colors.cyan : colors.textMuted}
+                    />
+                    <Text style={[styles.radioLabel, selected && styles.radioLabelSelected]}>
+                      {option.label}
+                    </Text>
+                    <Ionicons
+                      name={selected ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={selected ? colors.cyan : colors.textMuted}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {maintenanceActive ? (
+              <Text style={styles.radioHint}>Tap the selected mode again to turn protection back on.</Text>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.maintenanceDoneButton}
+              activeOpacity={0.85}
+              onPress={() => setMaintenanceModalVisible(false)}
+            >
+              <Text style={styles.maintenanceDoneText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <SectionLabel>Protection Summary</SectionLabel>
       <View style={styles.summaryGrid}>
@@ -371,6 +461,75 @@ const styles = StyleSheet.create({
   },
   actionCardDisabled: {
     opacity: 0.5,
+  },
+  actionCardActive: {
+    borderColor: colors.cyan,
+    backgroundColor: colors.cyanSoft,
+  },
+  maintenanceCard: {
+    borderColor: colors.cyan,
+  },
+  maintenanceIconFrame: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.cyanSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  radioGroup: {
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.carbon,
+    borderColor: colors.cardBorder,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  radioRowSelected: {
+    borderColor: colors.cyan,
+    backgroundColor: colors.cyanSoft,
+  },
+  radioLabel: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+  },
+  radioLabelSelected: {
+    color: colors.cyan,
+    fontFamily: fonts.bold,
+  },
+  radioHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontFamily: fonts.regular,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  maintenanceDoneButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    backgroundColor: colors.carbon,
+    borderColor: colors.cardBorder,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+  },
+  maintenanceDoneText: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.2,
   },
   actionCard: {
     flexBasis: '47%',
