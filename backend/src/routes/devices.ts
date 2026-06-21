@@ -113,6 +113,13 @@ devicesRouter.post('/:id/commands/siren', (req, res) => {
   return res.json({ ok: true });
 });
 
+devicesRouter.delete('/:id/commands/siren', (req, res) => {
+  const device = requireDevice(req.params.id);
+  if (!device) return res.status(404).json({ error: 'device not found' });
+  queueCommand(device.id, 'siren_off');
+  return res.json({ ok: true });
+});
+
 devicesRouter.patch('/:id/settings', (req, res) => {
   const device = requireDevice(req.params.id);
   if (!device) return res.status(404).json({ error: 'device not found' });

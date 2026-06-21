@@ -1,9 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-import { triggerSiren } from '../api/client';
+import { stopSiren, triggerSiren } from '../api/client';
 import { colors, fonts, gradients, radius, spacing } from '../../theme/tokens';
 import { Card, SectionLabel } from '../components/Card';
 import { Screen } from '../components/Screen';
@@ -46,17 +46,43 @@ function SummaryChip({ icon, label, value }: { icon: IoniconName; label: string;
 
 export function HomeScreen() {
   const { state, connection } = useAppState();
-  const [sirenBusy, setSirenBusy] = React.useState(false);
+  const [sirenActive, setSirenActive] = React.useState(false);
+  const [sirenSeconds, setSirenSeconds] = React.useState(0);
+  const [stopBusy, setStopBusy] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   const handleTriggerSiren = async () => {
-    if (sirenBusy) return;
-    setSirenBusy(true);
+    if (sirenActive) return;
+    await triggerSiren();
+    setSirenSeconds(0);
+    setSirenActive(true);
+    timerRef.current = setInterval(() => setSirenSeconds((s) => s + 1), 1000);
+  };
+
+  const handleStopSiren = async () => {
+    if (stopBusy) return;
+    setStopBusy(true);
     try {
-      await triggerSiren();
+      await stopSiren();
     } finally {
-      setSirenBusy(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setSirenActive(false);
+      setSirenSeconds(0);
+      setStopBusy(false);
     }
   };
+
+  const sirenTimeLabel = `${String(Math.floor(sirenSeconds / 60)).padStart(2, '0')}:${String(sirenSeconds % 60).padStart(2, '0')}`;
+
   const device = state.device;
 
   return (
@@ -94,6 +120,28 @@ export function HomeScreen() {
         </View>
       </LinearGradient>
 
+      <Modal visible={sirenActive} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconFrame}>
+              <Ionicons name="megaphone" size={32} color={colors.redAlert} />
+            </View>
+            <Text style={styles.modalTitle}>Siren Active</Text>
+            <Text style={styles.modalTimer}>{sirenTimeLabel}</Text>
+            <Text style={styles.modalSubtitle}>Siren has been active for the above duration.</Text>
+            <TouchableOpacity
+              style={[styles.stopButton, stopBusy && styles.actionCardDisabled]}
+              activeOpacity={0.85}
+              disabled={stopBusy}
+              onPress={handleStopSiren}
+            >
+              <Ionicons name="stop-circle" size={18} color="#fff" />
+              <Text style={styles.stopButtonText}>{stopBusy ? 'Stopping…' : 'Stop Siren'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <SectionLabel>Quick Actions</SectionLabel>
       <View style={styles.actionsGrid}>
         {quickActions.map((action) => {
@@ -101,17 +149,15 @@ export function HomeScreen() {
           return (
             <TouchableOpacity
               key={action.label}
-              style={[styles.actionCard, isSiren && sirenBusy && styles.actionCardDisabled]}
+              style={[styles.actionCard, isSiren && sirenActive && styles.actionCardDisabled]}
               activeOpacity={0.7}
-              disabled={isSiren && sirenBusy}
+              disabled={isSiren && sirenActive}
               onPress={isSiren ? handleTriggerSiren : undefined}
             >
               <View style={styles.actionIconFrame}>
                 <Ionicons name={action.icon} size={20} color={colors.emerald} />
               </View>
-              <Text style={styles.actionLabel}>
-                {isSiren && sirenBusy ? 'Triggering…' : action.label}
-              </Text>
+              <Text style={styles.actionLabel}>{action.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -260,6 +306,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.graphite,
+    borderColor: colors.redBorder,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    width: '100%',
+  },
+  modalIconFrame: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.redSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalTitle: {
+    color: colors.redAlert,
+    fontSize: 20,
+    fontFamily: fonts.black,
+    letterSpacing: 0.3,
+  },
+  modalTimer: {
+    color: colors.textPrimary,
+    fontSize: 48,
+    fontFamily: fonts.black,
+    letterSpacing: 2,
+  },
+  modalSubtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    textAlign: 'center',
+  },
+  stopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.redAlert,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.sm,
+    alignSelf: 'stretch',
+  },
+  stopButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    letterSpacing: 0.3,
   },
   actionCardDisabled: {
     opacity: 0.5,
