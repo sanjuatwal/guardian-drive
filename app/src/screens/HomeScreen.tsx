@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
+import { triggerSiren } from '../api/client';
 import { colors, fonts, gradients, radius, spacing } from '../../theme/tokens';
 import { Card, SectionLabel } from '../components/Card';
 import { Screen } from '../components/Screen';
@@ -45,6 +46,17 @@ function SummaryChip({ icon, label, value }: { icon: IoniconName; label: string;
 
 export function HomeScreen() {
   const { state, connection } = useAppState();
+  const [sirenBusy, setSirenBusy] = React.useState(false);
+
+  const handleTriggerSiren = async () => {
+    if (sirenBusy) return;
+    setSirenBusy(true);
+    try {
+      await triggerSiren();
+    } finally {
+      setSirenBusy(false);
+    }
+  };
   const device = state.device;
 
   return (
@@ -84,14 +96,25 @@ export function HomeScreen() {
 
       <SectionLabel>Quick Actions</SectionLabel>
       <View style={styles.actionsGrid}>
-        {quickActions.map((action) => (
-          <TouchableOpacity key={action.label} style={styles.actionCard} activeOpacity={0.7}>
-            <View style={styles.actionIconFrame}>
-              <Ionicons name={action.icon} size={20} color={colors.emerald} />
-            </View>
-            <Text style={styles.actionLabel}>{action.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {quickActions.map((action) => {
+          const isSiren = action.label === 'Trigger Siren';
+          return (
+            <TouchableOpacity
+              key={action.label}
+              style={[styles.actionCard, isSiren && sirenBusy && styles.actionCardDisabled]}
+              activeOpacity={0.7}
+              disabled={isSiren && sirenBusy}
+              onPress={isSiren ? handleTriggerSiren : undefined}
+            >
+              <View style={styles.actionIconFrame}>
+                <Ionicons name={action.icon} size={20} color={colors.emerald} />
+              </View>
+              <Text style={styles.actionLabel}>
+                {isSiren && sirenBusy ? 'Triggering…' : action.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <SectionLabel>Protection Summary</SectionLabel>
@@ -237,6 +260,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
+  },
+  actionCardDisabled: {
+    opacity: 0.5,
   },
   actionCard: {
     flexBasis: '47%',
