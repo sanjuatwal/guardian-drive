@@ -9,7 +9,7 @@
 #include "core/ThreatResponse.h"
 #include "core/AuthorizedModes.h"
 #include "actuators/Siren_Buzzer.h"
-#include "sensors/ProximityChecker_Stub.h"
+#include "sensors/ProximityChecker_BLE.h"
 #include "comms/Alerts_WiFi.h"
 
 IMUSensorMPU6050 imu;
@@ -18,7 +18,7 @@ StateManager stateManager;
 SirenBuzzer siren;
 ThreatResponse threatResponse(siren);
 AuthorizedModes authorizedModes;
-ProximityCheckerStub proximityChecker;
+ProximityCheckerBLE proximityChecker;
 AlertsWiFi alerts;
 
 namespace {
@@ -338,8 +338,8 @@ void setup() {
   alerts.begin();
   Serial.println("Siren bench commands: 'c'=theft candidate (chirp), 't'=theft mode (siren), 'n'=normal (silence)");
   Serial.println("Mode bench commands: 's'=toggle service mode, 'v'=toggle valet mode, 'w'=toggle tow mode");
-  Serial.println("Proximity bench commands: 'p'=toggle simulated phone nearby, 'k'=toggle simulated key tag nearby");
-  Serial.println("Defaults: phone/key tag NOT nearby — suspicious tilt auto-triggers Theft Mode (Section 12)");
+  Serial.println("Proximity: phone presence is now driven by real BLE link. 'p'=force phone override, 'k'=toggle simulated key tag");
+  Serial.println("Defaults: no phone connected + no key tag — suspicious tilt auto-triggers Theft Mode (Section 12)");
 
   scanI2C();
 

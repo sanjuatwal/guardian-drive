@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, spacing } from '../../theme/tokens';
+import { useProximity, ProximityStatus } from '../ble/useProximity';
 import { Card } from '../components/Card';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -31,12 +32,37 @@ function CheckRow({ icon, label, subtitle }: CheckRowProps) {
   );
 }
 
+function proximitySubtitle(status: ProximityStatus, rssi: number | null): string {
+  switch (status) {
+    case 'connected':
+      return rssi != null ? `Phone near vehicle · ${rssi} dBm` : 'Phone near vehicle';
+    case 'scanning':
+      return 'Searching for vehicle…';
+    case 'connecting':
+      return 'Linking to vehicle…';
+    case 'bluetooth-off':
+      return 'Turn on Bluetooth to detect proximity';
+    case 'permission-denied':
+      return 'Bluetooth permission needed';
+    case 'error':
+      return 'Bluetooth link error';
+    default:
+      return 'Idle';
+  }
+}
+
 export function CheckScreen() {
   const device = useDeviceSummary();
+  const proximity = useProximity();
 
   const rows: CheckRowProps[] = [
     { icon: 'heart-outline', label: 'Device Health', subtitle: 'All systems operational' },
     { icon: 'construct-outline', label: 'Service Mode', subtitle: `Manage service settings · ${device.serviceModeLabel}` },
+    {
+      icon: 'bluetooth-outline',
+      label: 'Phone Link (BLE)',
+      subtitle: proximitySubtitle(proximity.status, proximity.rssi),
+    },
     { icon: 'key-outline', label: 'Key Tag', subtitle: device.keyTagStatus },
     { icon: 'battery-charging-outline', label: 'Backup Battery', subtitle: device.backupBattery },
     { icon: 'terminal-outline', label: 'System Diagnostics', subtitle: 'Run full check' },

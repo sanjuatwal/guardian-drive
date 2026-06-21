@@ -24,7 +24,15 @@
       "android"
     ],
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "Guardian Drive uses Bluetooth to detect when your phone is near your vehicle, so it can tell an authorized trip from a theft."
+        }
+      ]
     ]
   }
 }
