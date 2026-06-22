@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -209,38 +209,28 @@ export function HomeScreen() {
               Pauses theft alerts and the siren. Location tracking and activity logs stay on.
             </Text>
 
-            <View style={styles.radioGroup}>
+            <View style={styles.toggleGroup}>
               {maintenanceOptions.map((option) => {
-                const selected = device.maintenanceMode === option.mode;
+                const active = device.maintenanceMode === option.mode;
                 return (
-                  <TouchableOpacity
-                    key={option.mode}
-                    style={[styles.radioRow, selected && styles.radioRowSelected]}
-                    activeOpacity={0.7}
-                    disabled={maintenanceBusy}
-                    onPress={() => applyMaintenance(selected ? 'off' : option.mode)}
-                  >
-                    <Ionicons
-                      name={option.icon}
-                      size={18}
-                      color={selected ? colors.cyan : colors.textMuted}
-                    />
-                    <Text style={[styles.radioLabel, selected && styles.radioLabelSelected]}>
+                  <View key={option.mode} style={[styles.toggleRow, active && styles.toggleRowActive]}>
+                    <View style={[styles.toggleIconFrame, active && styles.toggleIconFrameActive]}>
+                      <Ionicons name={option.icon} size={18} color={active ? colors.cyan : colors.textMuted} />
+                    </View>
+                    <Text style={[styles.toggleLabel, active && styles.toggleLabelActive]}>
                       {option.label}
                     </Text>
-                    <Ionicons
-                      name={selected ? 'radio-button-on' : 'radio-button-off'}
-                      size={20}
-                      color={selected ? colors.cyan : colors.textMuted}
+                    <Switch
+                      value={active}
+                      disabled={maintenanceBusy}
+                      onValueChange={() => applyMaintenance(active ? 'off' : option.mode)}
+                      trackColor={{ false: colors.cardBorder, true: colors.cyan }}
+                      thumbColor="#FFFFFF"
                     />
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
-
-            {maintenanceActive ? (
-              <Text style={styles.radioHint}>Tap the selected mode again to turn protection back on.</Text>
-            ) : null}
 
             <TouchableOpacity
               style={styles.maintenanceDoneButton}
@@ -478,12 +468,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  radioGroup: {
+  toggleGroup: {
     alignSelf: 'stretch',
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  radioRow: {
+  toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -494,26 +484,30 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
   },
-  radioRowSelected: {
+  toggleRowActive: {
     borderColor: colors.cyan,
     backgroundColor: colors.cyanSoft,
   },
-  radioLabel: {
+  toggleIconFrame: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: colors.graphite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleIconFrameActive: {
+    backgroundColor: colors.cyanSoft,
+  },
+  toggleLabel: {
     flex: 1,
     color: colors.textPrimary,
     fontSize: 14,
     fontFamily: fonts.medium,
   },
-  radioLabelSelected: {
+  toggleLabelActive: {
     color: colors.cyan,
     fontFamily: fonts.bold,
-  },
-  radioHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontFamily: fonts.regular,
-    textAlign: 'center',
-    marginTop: spacing.xs,
   },
   maintenanceDoneButton: {
     alignSelf: 'stretch',
