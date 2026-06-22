@@ -22,9 +22,12 @@ Detect suspicious activity before the vehicle is gone, alert the owner immediate
 ### 1. Theft Detection
 
 - Relay attack detection using key presence + vehicle unlock/start mismatch.
-- Tow, jack, and tilt detection using IMU movement patterns. The device saves the car's parked tilt angle as a baseline (accounting for hills or uneven surfaces) and flags a suspicious event only when the angle changes significantly from that baseline while the engine is off — not against flat ground.
+- Tow, jack, and tilt detection using IMU movement patterns. A single MPU-6050 in the rear/main unit, mounted firmly to the car body, senses whole-car motion (tilt / tow / jack / strong shock). The device saves the car's parked tilt angle as a baseline (accounting for hills or uneven surfaces) and flags a suspicious event only when the angle changes significantly from that baseline while the engine is off — not against flat ground.
 - Unauthorized start detection when the owner is not nearby.
-- Door, hood, and trunk open correlation to confirm suspicious access.
+- Layered intrusion sensing (hardware decision 2026-06-21, see hardware/BOM.md "Intrusion Sensing"):
+  - **Break-in attempt** — an automotive shock/vibration sensor near the driver door flags possible tampering (a single trigger on a GPIO, not a second door-mounted MPU — avoids unreliable long in-cabin I2C runs). On its own: short siren chirp + push, GPS/LTE readied.
+  - **Confirmed door/hood open** — magnetic reed switches (magnet on the moving panel, switch on the fixed frame) confirm an *actual* door or hood opening. This is the escalation gate from "possible attempt" to "confirmed entry/tamper."
+- Door, hood, and trunk open correlation to confirm suspicious access (door/hood via the reed switches above).
 - OBD port activity detection when service mode is off and owner phone + key tag are both absent. A mechanic or authorized user would have service mode enabled; unexpected OBD queries without it are a strong theft or cloning signal.
 - Crash vs. theft classification. An impact alone (parked car hit, minor collision) is not theft. The system correlates impact with follow-on events before escalating:
 
@@ -77,11 +80,13 @@ Terminology:
 
 | Condition | Action |
 |---|---|
-| Car not yet started | Start inhibit — relay cuts starter circuit, car cannot start |
+| Car not yet started | Start inhibit — relay interrupts the start authorization signal, car cannot start |
 | Car already moving | No inhibit — siren + GPS + lights only. Next-start inhibit arms silently. |
 | Car stops after moving (GPS speed < 8 km/h) | Next-start inhibit fires — car cannot restart |
 
 The speed gate (< 8 km/h) is enforced in firmware for next-start inhibit. The relay will not fire while the car is moving, even if the owner has confirmed theft.
+
+Start-inhibit hardware (Guardian Pro only — see Product Editions): the relay interrupts **only the start authorization signal**, never the main battery, ECU power, fuel pump, ABS, steering, or any safety circuit. On supported vehicles it is installed via a **vehicle-specific plug-in harness** that sits between a factory connector and its module (`factory connector → Guardian harness → factory module`) — **no factory wire cutting**, fully reversible, with an emergency bypass connector that restores the original connection if the device fails. Relay is normally-closed and fail-safe: device power loss → circuit restored, so a firmware bug can never strand the owner. The whole feature is about preventing **restart after confirmed theft while parked**, not stopping a moving vehicle.
 
 Full automatic vs. confirmed action reference:
 
@@ -511,11 +516,61 @@ User-facing UX principle:
 
 All features will be built. Access is gated by subscription tier so revenue scales with usage while the full product ships end-to-end.
 
-## Product Tiers
+## Product Editions (hardware install level) — DECISION 2026-06-21
+
+Two physical editions, distinct from the feature-rollout tiers (MVP/V1.5/V2) below. Editions are
+about *how much of the car is touched at install*; tiers are about *when features ship*.
+
+**Guardian Basic — no car wiring touched.** Self-contained, owner-installable.
+- GPS/LTE tracking, tilt/movement detection, key tag + phone presence, OBD tamper detection,
+  siren, jamming detection, app theft mode, event logging.
+- Detects, alerts, and tracks — but does not prevent restart.
+
+**Guardian Pro — professional install.** Everything in Basic, plus:
+- Vehicle-specific **plug-in harness** + relay-based **start inhibitor** (interrupts only the
+  start authorization signal; **no factory wire cutting**; reversible; emergency bypass connector).
+- Hidden installation, optional OBD relocation, optional hardwired power.
+
+> **Guardian Basic detects, alerts, and tracks. Guardian Pro adds preventing restart after
+> confirmed theft** (parked-only, per Section 3's start/next-start inhibit rules and the
+> Stop & Recovery Tier design in master-procurement-checklist.md).
+
+Why the plug-in harness for Pro instead of cutting a starter/ignition wire: it targets only the
+start authorization path (not main power/ECU/fuel/ABS/steering), keeps the install reversible and
+professional ("no factory wire cutting on supported vehicles"), avoids warranty/warning-light/
+resale concerns, and includes an emergency bypass so a device failure can't strand the owner.
+
+**Open questions for Guardian Pro harness design — RESOLVED 2026-06-22 (lean answers for current prototype stage):**
+- **Vehicle coverage / SKU scaling.** Resolution: don't try to cover all vehicles. Pick 2-3
+  high-volume vehicles first and license an existing aftermarket wiring database (e.g.,
+  iDatalink, Bulldog Security) instead of reverse-engineering wiring from scratch. Maintain an
+  explicit, growing **"Guardian Pro supported vehicles" whitelist** — Basic ships to every
+  vehicle regardless of make/model; Pro ships only where a verified harness exists. This also
+  reinforces the existing CAN/OBD-stays-read-only decision (Stop & Recovery scope) — the harness
+  never needs CAN access to inhibit start, so that boundary stays intact as coverage grows.
+- **Emergency bypass connector security.** Resolution: don't rely on physical hiding alone
+  (security-by-obscurity is weak). The relay's fail-safe behavior (device power loss → circuit
+  restored) stays purely physical, no auth needed — that's correct as-is. But *actively* using
+  the bypass while the device is powered should require the owner/installer to first enable
+  **Service Mode** from the app (Section 9 — time-windowed, logged with timestamp + actor).
+  Reuses an existing product pattern instead of inventing a new security primitive; a thief
+  finding the connector under the dash still can't silently defeat the inhibitor without an
+  authenticated app action.
+- **Per-vehicle identification process at install.** Resolution: no scanning tooling yet — too
+  much engineering for this stage. Write a one-time **install guide per supported vehicle**
+  (factory connector photo + pinout + which wire is the start-authorization signal), authored
+  once when that vehicle is validated, then handed to installers for that model. This is the
+  lean version of the aftermarket wiring databases above, built one vehicle at a time starting
+  with whichever vehicle the harness is first prototyped on.
+
+## Product Tiers (feature rollout)
 
 ### MVP — Ship First
 
-The core product. Strong enough to sell, defend, and generate early subscribers.
+The core product. Strong enough to sell, defend, and generate early subscribers. This MVP
+feature set is the **Guardian Basic** capability (detect / alert / track, no car wiring); the
+relay-based **start inhibitor** ships with **Guardian Pro** (see Product Editions above) and
+follows the parked-only start/next-start rules in Section 3.
 
 - Unauthorized unlock / start detection
 - Owner and authorized driver proximity check (phone + Guardian Key Tag)

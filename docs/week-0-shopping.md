@@ -127,12 +127,13 @@ Order these only when you reach the corresponding sprint. See `hardware/BOM.md` 
 | Phase | Component | When |
 |---|---|---|
 | Phase 2 | MOSFET relay module + 12V siren | Week 3 |
-| Phase 3 | u-blox NEO-M9N GPS (~$25) | Week 4-5 |
-| Phase 4 | Quectel BG95-M3 LTE module (~$30) | Week 6-7 |
+| Phase 3 | Quectel BG95-M3 (GPS + LTE in one) + LTE-M SIM (~$35) | Week 4-7 |
 | Phase 5 | BQ24074 power-path charger + Li-ion 5000-7000mAh | Week 8 |
 | Phase 6 | OBD-II cable + SN65HVD230 CAN transceiver | Week 9-10 |
 
-⚠️ Do NOT order NEO-6M GPS (EOL), SIM7600G-H (too power hungry), MCP2515 CAN (5V, wrong for ESP32), or TP4056 charger (no load sharing). See `hardware/BOM.md` for reasons.
+Plus: 2x reed switch + magnets (door/hood), automotive shock sensor (3.3V/5V) — see `hardware/BOM.md` "Intrusion Sensing".
+
+⚠️ Do NOT order NEO-6M GPS (EOL), SIM7600/7670 for the production build (too power hungry — BG95-M3 is the pick), MCP2515 CAN (5V, wrong for ESP32), 12V shock sensors straight to a GPIO, or TP4056 charger (no load sharing). See `hardware/BOM.md` for reasons.
 
 ---
 

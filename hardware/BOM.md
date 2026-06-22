@@ -38,8 +38,7 @@ Order in this sequence. Each unlocks the next test stage.
 |---|---|---|---|
 | Phase 1 | Already have everything | Week 1–2 | MPU-6050 tilt/tow bench testing |
 | Phase 2 | 12V siren + MOSFET relay module | Week 3 | Siren trigger without car |
-| Phase 3 | u-blox NEO-M9N GPS (not NEO-6M) | Week 4–5 | Location tracking |
-| Phase 4 | Quectel BG95-M3 LTE dev board | Week 6–7 | Cloud alerts |
+| Phase 3 | Quectel BG95-M3 (GPS + LTE in one module) | Week 4–7 | Location tracking + cloud alerts (built-in GNSS, so no separate GPS) |
 | Phase 5 | Power-path LiPo charger + battery | Week 8 | Backup battery testing |
 | Phase 6 | OBD-II cable + SN65HVD230 CAN transceiver | Week 9–10 | Vehicle CAN reading |
 
@@ -73,35 +72,43 @@ then port the driver to ICM-42688-P before manufacturing.
 
 ---
 
-### GPS (Do NOT buy NEO-6M — it is EOL)
+### GPS + LTE Tracking — DECISION 2026-06-21: go straight to BG95-M3
 
-NEO-6M is end-of-life. u-blox issued EOL notices for all u-blox 6 modules.
-Do not order it even for dev — order the correct module from the start.
+Product decision: **private GPS + LTE tracking, NOT AirTag / Find My style.** A crowd-sourced
+Bluetooth tracker would trigger "unknown tracker moving with you" anti-stalking alerts on the
+thief's phone. The flow is: device gets GPS fix → sends location over LTE/SIM → owner sees it in
+the app. The firmware keeps GPS and the cellular uplink behind driver interfaces (`Alerts.h`), so
+the exact module can change without touching tracking logic.
 
+**Decision:** skip the SIM7600/7670 prototype step and go directly with **BG95-M3** — same ~$30
+price as the SIM7670G, but it's the low-power production-grade module, so we don't buy twice. One
+module covers BOTH GPS and LTE (built-in GNSS); no separate GPS needed.
+
+#### Buy now
 | Part | Use | Notes | Price |
 |---|---|---|---|
-| **u-blox NEO-M9N** | ✅ Dev + Production | Fast cold start, multi-GNSS, 3.3V, current production part | ~$25 |
-| u-blox MAX-M10S | Alternative production | Smallest, lowest power, ultra-compact | ~$20 |
+| **Quectel BG95-M3 board** | ✅ GPS + LTE (one module) | LTE-M/NB-IoT + built-in GNSS, low power, production-grade | ~$30–50 |
+| **LTE-M-capable data SIM** | ✅ Required | Hologram or Twilio Super SIM — **must have LTE-M enabled** (BG95 does NOT do regular LTE). Production: Rogers/Bell IoT SIM (Canadian LTE-M cert) | ~$5–10 |
 
-Buy NEO-M9N for Phase 3. It works for both dev testing and production.
-No reason to buy a cheaper GPS and then switch — the price difference is small.
-
----
-
-### LTE / Cellular (SIM7600G-H for learning only)
-
-| Part | Use | Notes | Price |
+#### Only if needed (do NOT buy upfront)
+| Part | When | Notes | Price |
 |---|---|---|---|
-| **SIM7600G-H dev board** | Dev/learning only | Cat-4 LTE, power hungry (~2A peak), oversized for IoT | ~$35 |
-| **Quectel BG95-M3** | ✅ Production | LTE-M/NB-IoT, GNSS built-in, low power, IoT-optimized | ~$30 |
-| SIMCom SIM7080G | Alternative production | LTE-M/NB-IoT, low power, good Canadian carrier support | ~$25 |
+| u-blox NEO-M9N / MAX-M10S | Only if BG95's built-in GNSS is too weak | Dedicated GNSS for faster fix / better sensitivity under trees/buildings; 3.3V | ~$20–25 |
+| ESP32 + SIM7670G board | Only if BG95/LTE-M bring-up stalls | Fallback prototype path: runs on normal LTE (easier to get connected), Cat-1 | ~$30–40 |
 
-SIM7600G-H is acceptable for Phase 4 learning. Switch to BG95-M3 before
-real car testing. BG95 also has built-in GNSS so you may not need separate
-GPS module — evaluate this when you reach Phase 4.
+#### Do NOT buy
+| Part | Why |
+|---|---|
+| ~~NEO-6M~~ | EOL (all u-blox 6 modules) |
+| ~~SIM7600G-H~~ | Cat-4, power hungry (~2A bursts), oversized for a tracker |
 
-SIM card: Hologram or Twilio Super SIM for dev. Evaluate Rogers/Bell IoT
-SIM for production (Canadian carrier certification matters for LTE-M).
+Caveats for going straight to BG95-M3:
+- **LTE-M SIM is mandatory** — BG95 is LTE-M/NB-IoT only; a plain data SIM may not connect.
+  Hologram and Twilio Super SIM both support LTE-M (enable it on the plan).
+- **Slightly more dev effort** — LTE-M registration / AT-command bring-up is fiddlier than the
+  hobby-friendly SIM7670G all-in-one. The SIM7670G fallback above exists if BG95 fights us.
+- **LTE power:** cellular TX bursts will brown out / reset the ESP. Add a bulk capacitor
+  (~1000µF+) at the module's supply, and feed from a solid 5V source — not laptop USB.
 
 ---
 
@@ -201,14 +208,47 @@ Always use a MOSFET or relay driver between ESP32 and siren.
 
 ### Proximity Detection (Owner Phone + Key Tag)
 
-BLE is built into ESP32-S3 and sufficient for MVP (phone proximity detection).
-UWB is required only for production-grade relay attack detection accuracy.
+BLE is built into ESP32-S3 and sufficient for MVP. The main unit runs **dual-role BLE**: it is a
+**peripheral** for the owner's phone (phone scans/connects — iOS background scanning is reliable,
+advertising is not) and a **central/scanner** for the Guardian Key Tag (the ESP32-C3 tag
+advertises; the main unit scans for it). ESP32-S3 supports both roles at once — watch memory.
 
 | Part | Use | Notes | Price |
 |---|---|---|---|
-| ESP32-S3 BLE (built-in) | ✅ MVP proximity | Phone detection, ~1–5m accuracy, sufficient for MVP | Free |
+| ESP32-S3 BLE (built-in) | ✅ MVP proximity | Phone (peripheral) + key tag scan (central), ~1–5m, sufficient for MVP | Free |
+| **ESP32-C3 mini / Seeed XIAO ESP32-C3** | ✅ Key Tag (V1) | BLE key tag: broadcasts presence, main unit scans; tiny piezo for "Find My Key" beep (BLE range only). No GPS in tag V1 | ~$5 (have x3) |
 | Qorvo DWM3000EVB | Production relay attack | UWB ~10cm accuracy, required for high-confidence relay detection | ~$30 |
-| Guardian Key Tag | Custom PCB (future) | Bluetooth/UWB tag on car key, does not exist yet | TBD |
+
+Key Tag V1 deliberately has **no GPS** — its job is "is a trusted key near the car," not global
+tracking. GPS in the tag would add cost, size, battery drain, and need its own LTE uplink.
+
+---
+
+### Intrusion Sensing (door / hood / vibration) — DECISION 2026-06-21: layered sensors
+
+Layered approach so a weak signal escalates only when confirmed. The MPU sees whole-car motion;
+the shock sensor flags a break-in *attempt*; the reed switches *confirm* an actual door/hood open.
+
+| Part | Use | Notes | Price |
+|---|---|---|---|
+| **MPU-6050 (rear/main unit)** | ✅ Whole-car motion | Tilt / tow / jack / strong shock. Mounted firmly inside the main enclosure on the car body — never loose. Already have x5 (dev) | ~$5 |
+| **Automotive shock / vibration sensor** | ✅ Door/front-area attempt | Break-in vibration near driver door. Simple trigger output — better than a 2nd MPU (no long I2C run in-cabin). ⚠️ Use a 3.3V/5V module, NOT a 12V car-alarm sensor straight into a GPIO (needs optocoupler/divider if 12V) | ~$3–6 |
+| **Magnetic reed switch x2** | ✅ Door + hood open confirm | One on door frame, one on engine-bay frame; magnet on the moving door/hood. Closed = magnet near = shut; open = magnet away. Trivial wiring: GPIO + internal pull-up | ~$1 each |
+| **Small neodymium magnets x2** | ✅ Reed pairs | Pair with each reed switch | ~$1 |
+
+Why shock sensor instead of a second MPU at the door: I2C is not meant for long in-cabin cable
+runs (unreliable). A shock sensor is a single digital trigger on a GPIO — simpler and tunable.
+
+Escalation logic (with phone/key tag absent → Suspicious Watch Mode):
+```
+Shock sensor       -> possible break-in attempt -> short siren chirp + push alert + GPS/LTE ready
+Door reed OPEN     -> confirmed unauthorized entry -> full siren + high-rate GPS/LTE tracking
+Hood reed OPEN     -> confirmed hood tamper -> full siren + high-rate GPS/LTE tracking
+Rear MPU tilt/tow  -> possible tow/jack -> siren + push (severity-dependent)
+```
+
+⚠️ Before wiring: confirm free GPIO count once GPS/LTE UART + MPU I2C + siren + shock + 2 reed
+inputs are all assigned, and protect any car-side inputs (debounce, pull-ups, transient).
 
 ---
 
@@ -217,16 +257,18 @@ UWB is required only for production-grade relay attack detection accuracy.
 | Subsystem | Production Component | Status |
 |---|---|---|
 | MCU | ESP32-S3 (V1) → nRF52840 (V2) | Confirmed |
-| IMU | ICM-42688-P | Not yet ordered |
-| GPS | u-blox NEO-M9N or MAX-M10S | Not yet ordered |
-| LTE | Quectel BG95-M3 | Not yet ordered |
+| IMU (whole-car motion) | ICM-42688-P (rear/main unit) | Not yet ordered |
+| GPS/LTE | BG95-M3 (one module, built-in GNSS; NEO-M9N only if GNSS too weak) | Not yet ordered |
+| Door/hood open | 2x magnetic reed switch + magnets | Not yet ordered |
+| Break-in vibration | Automotive shock sensor (3.3V/5V module) | Not yet ordered |
+| Key Tag | ESP32-C3 BLE (V1, no GPS) | Have x3 |
 | CAN | ESP32 TWAI + SN65HVD230 | Not yet ordered |
 | Power | BQ24074/BQ24075 power-path charger | Not yet ordered |
 | Battery | 5000–7000mAh Li-ion | Size TBD after current measurement |
 | Evidence storage | SPI NOR Flash + microSD | Not yet ordered |
-| Power regulation | Automotive-rated 12V→5V + fuse + TVS | Not yet ordered |
+| Power regulation | Automotive-rated 12V→5V + fuse + TVS | Have buck/TVS/fuse |
 | Siren driver | MOSFET relay module | Not yet ordered |
-| Proximity | BLE (built-in) for MVP, UWB (DWM3000) for V2 | V2 only |
+| Proximity | Dual-role BLE: phone (peripheral) + key tag (central); UWB (DWM3000) for V2 | V2 only |
 | Enclosure | IP65 weatherproof, salt/vibration rated | Design TBD |
 
 ---

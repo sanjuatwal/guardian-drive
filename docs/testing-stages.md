@@ -31,22 +31,27 @@ Never connect to the car until Stages 1 and 2 are fully passing.
 > Glass break detection is removed from MVP. The INMP441 mic is kept as a passive evidence recorder only.
 > No bench test needed for audio detection. Wire and test only if glass break is added in V1.5+.
 
-#### GPS (u-blox NEO-M9N)
-- [ ] Wire NEO-M9N to ESP32 via UART (TX→RX, RX→TX, 3.3V, GND)
-- [ ] Upload TinyGPS++ read sketch
-- [ ] Take the breadboard near a window or go outside
-- [ ] Confirm latitude/longitude printing within 30–60 seconds cold start (NEO-M9N is faster than NEO-6M)
-- [ ] Confirm time/date from GPS signal is correct
+#### GPS + LTE (Quectel BG95-M3 — one module does both)
 
-#### LTE (Quectel BG95-M3)
-- [ ] Insert SIM card (Hologram or Twilio Super SIM for dev)
-- [ ] Wire BG95-M3 via UART to ESP32
+BG95-M3 has built-in GNSS, so GPS and the cellular uplink come from the same module — no
+separate GPS part. Test GPS first (no SIM needed), then the LTE uplink.
+
+GPS (GNSS):
+- [ ] Wire BG95-M3 to ESP32 via UART (TX→RX, RX→TX, 3.3V, GND); add a bulk cap (~1000µF) on the module supply
+- [ ] Enable GNSS via AT command (`AT+QGPS=1`)
+- [ ] Take the breadboard near a window or go outside
+- [ ] Confirm latitude/longitude (`AT+QGPSLOC?`) within ~30–60 s cold start
+- [ ] Confirm time/date from GPS is correct
+
+LTE uplink:
+- [ ] Insert an **LTE-M-enabled** SIM (Hologram or Twilio Super SIM — BG95 does NOT do plain LTE)
 - [ ] Use AT commands to confirm module responds: `AT` → `OK`
-- [ ] Confirm cellular registration: `AT+CEREG?` → registered
+- [ ] Confirm cellular registration: `AT+CEREG?` → registered (LTE-M mode)
 - [ ] Send a test HTTP POST to a webhook (use webhook.site for quick testing)
 - [ ] Confirm the payload arrives in browser
 
-> Note: BG95-M3 supports LTE-M/NB-IoT. Use LTE-M mode for Canadian carriers.
+> Note: BG95-M3 is LTE-M/NB-IoT only. Use LTE-M mode for Canadian carriers, and make sure the
+> SIM has LTE-M enabled or it will not register.
 
 #### Backup Battery (Li-ion + BQ24074 power-path charger)
 - [ ] Connect Li-ion battery to BQ24074 charger module

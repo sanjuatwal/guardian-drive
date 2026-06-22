@@ -35,7 +35,7 @@
 These apply to every line of code written — firmware, backend, and app.
 ### Week 1 — June 4–8: Foundation (do this NOW, hardware in transit)
 - **Logic is always separate from hardware.** Business logic (risk scoring, theft detection, event logging) never talks to a sensor, chip, or protocol directly. It talks to an interface. The interface hides the hardware.
-- **One driver file per component.** MPU-6050 has one file. NEO-M9N has one file. BG95-M3 has one file. Swapping a component = rewriting that one file, nothing else.
+- **One driver file per component.** MPU-6050 has one file. BG95-M3 (GPS+LTE) has one file. The shock sensor and each reed switch have their own. Swapping a component = rewriting that one file, nothing else.
 - **Interfaces never change. Drivers change.** `IMUSensor.h` is permanent. `IMUSensor_MPU6050.cpp` is replaceable. This is the contract.
 - **No hardware constants in logic files.** GPIO pin numbers, I2C addresses, baud rates go in the driver file or a config header. Never hardcoded inside risk scoring or event logging.
 - **Test logic without hardware.** Risk scoring, state machine, and event correlation must be testable on a laptop with mock data — no physical board required.
@@ -131,10 +131,9 @@ These apply to every line of code written — firmware, backend, and app.
 
 | Task | Who | Status |
 |---|---|---|
-| Wire u-blox NEO-M9N GPS to ESP32 UART | E1 | — |
-| Parse NMEA sentences: lat, lon, speed, heading | E1 | — |
-| Wire Quectel BG95-M3 LTE module to ESP32 UART | E1 | — |
-| LTE HTTP POST: send events over cellular (failover from WiFi) | E1 | — |
+| Wire Quectel BG95-M3 (GPS + LTE, one module) to ESP32 UART; bulk cap on supply | E1 | — |
+| Enable GNSS + parse location: lat, lon, speed, heading | E1 | — |
+| LTE-M HTTP POST: send events over cellular (failover from WiFi); LTE-M SIM required | E1 | — |
 | Firmware power-state machine: Driving/Parked/Suspicious/Theft automatic modes | E1 | — |
 | Adaptive ping rate: parked → 2h, suspicious → 60s, theft → 10s, low battery → 2m | E1 | — |
 | SPIFFS local storage: buffer events when offline, upload on reconnect | E1 | — |
@@ -288,7 +287,7 @@ No firmware work for audio detection until after V1.5 ships.
 | Task | Both | Status |
 |------|-------|--------|
 | Research UART, SPI, CAN protocols together | ✓ | — |
-| Review u-blox NEO-M9N GPS datasheet | ✓ | — |
+| Review Quectel BG95-M3 datasheet (GPS + LTE-M, AT commands) | ✓ | — |
 | Review SN65HVD230 CAN transceiver datasheet | ✓ | — |
 | **Engineer-One**: Wire GPS, implement UART driver | E1 | — |
 | **Engineer-Two**: Wire CAN transceiver (ESP32 TWAI + SN65HVD230), implement driver | E2 | — |
