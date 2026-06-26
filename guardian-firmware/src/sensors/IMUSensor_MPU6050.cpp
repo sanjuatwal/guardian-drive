@@ -6,6 +6,7 @@ namespace {
 constexpr uint8_t kRegPwrMgmt1 = 0x6B;
 constexpr uint8_t kRegAccelXoutH = 0x3B;
 constexpr float kAccelScale = 16384.0f;  // +/-2g default
+constexpr float kEmaAlpha = 0.3f;  // ~3-sample (~0.9s @300ms loop) settle time
 }  // namespace
 
 IMUSensorMPU6050::IMUSensorMPU6050(uint8_t i2cAddress) : addr_(i2cAddress) {}
@@ -34,8 +35,21 @@ bool IMUSensorMPU6050::read(IMUReading& out) {
   out.az = static_cast<float>(azRaw) / kAccelScale;
 
   // Simple gravity-vector tilt estimate for bench testing.
-  out.pitchDeg = atan2f(out.ax, sqrtf(out.ay * out.ay + out.az * out.az)) * 57.2958f;
-  out.rollDeg = atan2f(out.ay, sqrtf(out.ax * out.ax + out.az * out.az)) * 57.2958f;
+  const float pitchRaw = atan2f(out.ax, sqrtf(out.ay * out.ay + out.az * out.az)) * 57.2958f;
+  const float rollRaw = atan2f(out.ay, sqrtf(out.ax * out.ax + out.az * out.az)) * 57.2958f;
+
+  // EMA-smooth the angle, not the raw accel, so impact-spike detection
+  // (which reads out.ax/ay/az directly) still sees instantaneous values.
+  if (!filterInitialized_) {
+    filteredPitchDeg_ = pitchRaw;
+    filteredRollDeg_ = rollRaw;
+    filterInitialized_ = true;
+  } else {
+    filteredPitchDeg_ = kEmaAlpha * pitchRaw + (1.0f - kEmaAlpha) * filteredPitchDeg_;
+    filteredRollDeg_ = kEmaAlpha * rollRaw + (1.0f - kEmaAlpha) * filteredRollDeg_;
+  }
+  out.pitchDeg = filteredPitchDeg_;
+  out.rollDeg = filteredRollDeg_;
 
   return true;
 }

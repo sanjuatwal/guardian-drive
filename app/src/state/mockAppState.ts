@@ -11,7 +11,8 @@ export const mockAppState: MockAppState = {
     backupBattery: '92%',
     keyTagStatus: 'Connected',
     locationLabel: 'Oak Ave, Sector 17, New York, NY',
-    serviceModeLabel: 'Off',
+    maintenanceMode: 'off',
+    maintenanceModeLabel: 'Off',
   },
   recentActivity: [
     {
@@ -23,5 +24,6 @@ export const mockAppState: MockAppState = {
     },
   ],
   currentAlert: null,
+  latestConfirmedAlertId: null,
   privacyMode: 'balanced',
 };

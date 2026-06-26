@@ -15,6 +15,17 @@ export const colors = {
   logoGlow: "#00E3B0",    // target: emerald, matches UI theme (was gold #C9A840 in original logo)
   logoHighlight: "#00D1FF", // target: cyan (was warm gold #E8C96A in original logo)
 
+  // Status
+  amberWarn: "#FFB020",
+
+  // Soft tints for icon containers and pill backgrounds
+  emeraldSoft: "rgba(0, 227, 176, 0.12)",
+  cyanSoft: "rgba(0, 209, 255, 0.12)",
+  redSoft: "rgba(255, 59, 48, 0.12)",
+  amberSoft: "rgba(255, 176, 32, 0.12)",
+  emeraldBorder: "rgba(0, 227, 176, 0.35)",
+  redBorder: "rgba(255, 59, 48, 0.45)",
+
   // Text
   textPrimary: "#E6F1FF",
   textMuted: "#93A3B8",
@@ -25,6 +36,13 @@ export const gradients = {
   appBackground: ["#05070B", "#0A1018"],
   cardGlow: ["rgba(0, 227, 176, 0.20)", "rgba(0, 209, 255, 0.12)"],
   dangerGlow: ["rgba(255, 59, 48, 0.25)", "rgba(255, 59, 48, 0.05)"],
+} as const;
+
+export const fonts = {
+  regular: "Satoshi-Regular",
+  medium: "Satoshi-Medium",
+  bold: "Satoshi-Bold",
+  black: "Satoshi-Black",
 } as const;
 
 export const typography = {
