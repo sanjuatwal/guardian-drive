@@ -64,6 +64,23 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_commands_device ON commands(device_id, delivered_at);
+
+  CREATE TABLE IF NOT EXISTS users (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at    INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 `);
 
 // Migration: maintenance_mode ('off' | 'service' | 'valet' | 'towing')

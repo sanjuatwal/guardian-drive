@@ -9,6 +9,7 @@ import { colors, fonts, gradients, motion, radius, spacing } from '../../theme/t
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { useAppState } from '../state/AppStateContext';
+import { useAuth } from '../state/AuthContext';
 
 const fallbackReasons = [
   'Movement while parked',
@@ -19,6 +20,7 @@ const fallbackReasons = [
 export function AlertScreen() {
   const navigation = useNavigation();
   const { state, refresh } = useAppState();
+  const { confirmWithBiometrics } = useAuth();
   const [busy, setBusy] = useState(false);
   const alert = state.currentAlert;
   const reasons = alert?.reasons.length ? alert.reasons : fallbackReasons;
@@ -29,6 +31,8 @@ export function AlertScreen() {
     try {
       if (alert?.id) {
         if (action === 'confirm') {
+          const verified = await confirmWithBiometrics('Confirm this is a real theft');
+          if (!verified) return;
           await confirmAlert(alert.id);
         } else {
           await dismissAlert(alert.id);

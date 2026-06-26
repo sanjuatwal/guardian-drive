@@ -1,4 +1,19 @@
 // Mirrors app/src/types/app.ts so the app can consume /state responses directly.
+export type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  created_at: number;
+};
+
+export type SessionRow = {
+  token: string;
+  user_id: string;
+  created_at: number;
+  expires_at: number;
+};
+
 export type DeviceStatus = 'protected' | 'service' | 'alert' | 'recovery' | 'offline' | 'degraded';
 export type PrivacyMode = 'private' | 'balanced' | 'recovery' | 'always-on';
 export type MaintenanceMode = 'off' | 'service' | 'valet' | 'towing';
