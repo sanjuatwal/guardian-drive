@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { config } from '../config';
 import { db } from '../db';
-import { getActiveAlert, getDevice, getRecentEvents, ingestEvent } from '../eventIngest';
+import { getActiveAlert, getDevice, getLatestConfirmedAlert, getRecentEvents, ingestEvent } from '../eventIngest';
 import { broadcast } from '../live';
 import { toActivityEvent, toAppState } from '../presenter';
 import { queueCommand } from './commands';
@@ -64,7 +64,13 @@ devicesRouter.get('/:id/state', (req, res) => {
 
   const events = getRecentEvents.all(device.id, 20);
   const alert = getActiveAlert.get(device.id) ?? null;
-  return res.json(toAppState(device, events, alert));
+  // Police Pack should only be offered while this incident's recovery is
+  // still open. The alert row itself stays 'confirmed' forever (so evidence
+  // is always available via /evidence), but we stop surfacing it here once
+  // the owner marks the vehicle recovered and status leaves 'recovery'.
+  const latestConfirmed =
+    device.status === 'recovery' ? getLatestConfirmedAlert.get(device.id) ?? null : null;
+  return res.json(toAppState(device, events, alert, latestConfirmed?.id ?? null));
 });
 
 devicesRouter.get('/:id/events', (req, res) => {

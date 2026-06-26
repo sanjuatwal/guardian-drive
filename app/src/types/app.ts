@@ -36,5 +36,6 @@ export type MockAppState = {
   device: DeviceSummary;
   recentActivity: ActivityEvent[];
   currentAlert: AlertSummary | null;
+  latestConfirmedAlertId: string | null;
   privacyMode: PrivacyMode;
 };
