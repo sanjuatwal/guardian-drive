@@ -1,15 +1,18 @@
 import { Router } from 'express';
+import { z } from 'zod';
 
 import { db } from '../db';
 import { lockEvidence, verifyEvidence } from '../evidenceVault';
 import { broadcast } from '../live';
+import { buildPolicePackPdf, sendPolicePackEmail } from '../policePack';
 import { toActivityEvent } from '../presenter';
 import { queueCommand } from './commands';
-import { AlertRow, EventRow } from '../types';
+import { AlertRow, DeviceRow, EventRow } from '../types';
 
 export const alertsRouter = Router();
 
 const getAlert = db.prepare<[string], AlertRow>(`SELECT * FROM alerts WHERE id = ?`);
+const getDeviceById = db.prepare<[string], DeviceRow>(`SELECT * FROM devices WHERE id = ?`);
 
 // Owner tapped "Confirm Theft": device enters recovery, evidence is hash-locked.
 alertsRouter.post('/:id/confirm', (req, res) => {
@@ -30,6 +33,23 @@ alertsRouter.post('/:id/confirm', (req, res) => {
 
   broadcast(alert.device_id, { type: 'alert_confirmed', alertId: alert.id });
   return res.json({ ok: true, status: 'confirmed', evidence });
+});
+
+// Owner marks the vehicle as recovered: closes out the recovery, returns the
+// device to 'protected', and stops surfacing this alert as the device's
+// latestConfirmedAlertId (which is what gates the Police Pack button). The
+// alert row itself stays 'confirmed' and its evidence stays locked/available
+// via GET /evidence — nothing here deletes or unlocks anything.
+alertsRouter.post('/:id/recovered', (req, res) => {
+  const alert = getAlert.get(req.params.id);
+  if (!alert) return res.status(404).json({ error: 'alert not found' });
+  if (alert.status !== 'confirmed') {
+    return res.status(409).json({ error: `alert is ${alert.status}, not confirmed` });
+  }
+
+  db.prepare(`UPDATE devices SET status = 'protected' WHERE id = ?`).run(alert.device_id);
+  broadcast(alert.device_id, { type: 'vehicle_recovered', alertId: alert.id });
+  return res.json({ ok: true });
 });
 
 // Owner tapped "It's Me — False Alarm".
@@ -80,4 +100,49 @@ alertsRouter.get('/:id/evidence', (req, res) => {
       locked: Boolean(event.locked),
     })),
   });
+});
+
+const policePackSchema = z.object({
+  recipientName: z.string().min(1).max(120),
+  recipientEmail: z.string().email(),
+});
+
+// Generates the incident PDF and emails it directly to the given recipient.
+// The PDF bytes never leave the server — the app only ever sees { ok: true }
+// or an error, never the file itself or a download link.
+alertsRouter.post('/:id/police-pack', async (req, res) => {
+  const alert = getAlert.get(req.params.id);
+  if (!alert) return res.status(404).json({ error: 'alert not found' });
+  if (alert.status !== 'confirmed') {
+    return res.status(409).json({ error: 'police pack is only available for confirmed alerts' });
+  }
+
+  const parsed = policePackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const device = getDeviceById.get(alert.device_id);
+  if (!device) return res.status(404).json({ error: 'device not found' });
+
+  const events = db
+    .prepare<[string], EventRow>(`SELECT * FROM events WHERE alert_id = ? ORDER BY created_at ASC`)
+    .all(alert.id);
+  const verification = verifyEvidence(alert);
+
+  try {
+    const pdfBuffer = await buildPolicePackPdf(device, alert, events, parsed.data.recipientName, verification);
+    await sendPolicePackEmail({
+      toEmail: parsed.data.recipientEmail,
+      recipientName: parsed.data.recipientName,
+      device,
+      alert,
+      pdfBuffer,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'failed to send police pack';
+    return res.status(502).json({ error: message });
+  }
+
+  return res.json({ ok: true });
 });

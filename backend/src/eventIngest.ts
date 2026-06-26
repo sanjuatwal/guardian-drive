@@ -14,6 +14,9 @@ export const getRecentEvents = db.prepare<[string, number], EventRow>(
 export const getActiveAlert = db.prepare<[string], AlertRow>(
   `SELECT * FROM alerts WHERE device_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
 );
+export const getLatestConfirmedAlert = db.prepare<[string], AlertRow>(
+  `SELECT * FROM alerts WHERE device_id = ? AND status = 'confirmed' ORDER BY created_at DESC LIMIT 1`,
+);
 
 export type EventVitals = {
   detail?: string | null;

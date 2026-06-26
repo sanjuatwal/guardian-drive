@@ -1,4 +1,7 @@
 import path from 'node:path';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -9,4 +12,8 @@ export const config = {
   clusterWindowMs: 10 * 60 * 1000,
   // A cluster scoring at or above this creates an alert.
   alertThreshold: 70,
+  // Resend (resend.com) — used to email the Police Pack PDF directly to the
+  // recipient. Police Pack requests fail with 503 until this is set.
+  resendApiKey: process.env.RESEND_API_KEY ?? null,
+  resendFromEmail: process.env.RESEND_FROM_EMAIL ?? 'Guardian Drive <onboarding@resend.dev>',
 };

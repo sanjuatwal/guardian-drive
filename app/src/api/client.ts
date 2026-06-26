@@ -41,6 +41,10 @@ export function dismissAlert(alertId: string): Promise<{ ok: boolean }> {
   return request(`/api/v1/alerts/${alertId}/dismiss`, { method: 'POST' });
 }
 
+export function markVehicleRecovered(alertId: string): Promise<{ ok: boolean }> {
+  return request(`/api/v1/alerts/${alertId}/recovered`, { method: 'POST' });
+}
+
 export function triggerSiren(): Promise<{ ok: boolean }> {
   return request(`/api/v1/devices/${DEVICE_ID}/commands/siren`, { method: 'POST' });
 }
@@ -53,5 +57,18 @@ export function setMaintenanceMode(mode: MaintenanceMode): Promise<{ ok: boolean
   return request(`/api/v1/devices/${DEVICE_ID}/settings`, {
     method: 'PATCH',
     body: JSON.stringify({ maintenanceMode: mode }),
+  });
+}
+
+// Backend generates the PDF and emails it directly to recipientEmail — the
+// response never contains the file, only an ok/error ack.
+export function sendPolicePack(
+  alertId: string,
+  recipientName: string,
+  recipientEmail: string,
+): Promise<{ ok: boolean }> {
+  return request(`/api/v1/alerts/${alertId}/police-pack`, {
+    method: 'POST',
+    body: JSON.stringify({ recipientName, recipientEmail }),
   });
 }

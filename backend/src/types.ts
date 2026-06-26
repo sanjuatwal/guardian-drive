@@ -104,5 +104,9 @@ export type AppState = {
   device: DeviceSummary;
   recentActivity: ActivityEvent[];
   currentAlert: AlertSummary | null;
+  // Most recent confirmed alert, regardless of how long ago. Confirmed
+  // alerts drop out of currentAlert (which only tracks 'active'), so the app
+  // needs this to know which incident to send a Police Pack for.
+  latestConfirmedAlertId: string | null;
   privacyMode: PrivacyMode;
 };

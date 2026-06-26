@@ -24,5 +24,6 @@ export const mockAppState: MockAppState = {
     },
   ],
   currentAlert: null,
+  latestConfirmedAlertId: null,
   privacyMode: 'balanced',
 };
