@@ -11,7 +11,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.guardiandrive.app"
+      "bundleIdentifier": "com.guardiandrive.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Guardian Drive uses Face ID to confirm it's really you before unlocking the app or sending sensitive actions like Confirm Theft or Police Pack."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -29,10 +32,13 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Guardian Drive uses Bluetooth to detect when your phone is near your vehicle, so it can tell an authorized trip from a theft."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

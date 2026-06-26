@@ -10,7 +10,12 @@ import { RecoveryScreen } from '../screens/RecoveryScreen';
 import { CheckScreen } from '../screens/CheckScreen';
 import { AlertsScreen } from '../screens/AlertsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { LoginScreen } from '../screens/LoginScreen';
+import { SignUpScreen } from '../screens/SignUpScreen';
+import { EnableBiometricsScreen } from '../screens/EnableBiometricsScreen';
+import { UnlockScreen } from '../screens/UnlockScreen';
 import { useAppState } from '../state/AppStateContext';
+import { useAuth } from '../state/AuthContext';
 import { colors, fonts } from '../../theme/tokens';
 
 const Tab = createBottomTabNavigator();
@@ -93,13 +98,30 @@ function AlertWatcher() {
 }
 
 export function AppNavigator() {
+  const { phase } = useAuth();
+
+  // 'loading': restoring a saved session — render nothing for an instant
+  // rather than flashing the login screen.
+  if (phase === 'loading') return null;
+  if (phase === 'locked') return <UnlockScreen />;
+  if (phase === 'enroll-biometrics') return <EnableBiometricsScreen />;
+
   return (
     <NavigationContainer ref={navigationRef} theme={guardianTheme}>
-      <AlertWatcher />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="Alert" component={AlertScreen} options={{ presentation: 'fullScreenModal' }} />
-      </Stack.Navigator>
+      {phase === 'signed-out' ? (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+        </Stack.Navigator>
+      ) : (
+        <>
+          <AlertWatcher />
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Alert" component={AlertScreen} options={{ presentation: 'fullScreenModal' }} />
+          </Stack.Navigator>
+        </>
+      )}
     </NavigationContainer>
   );
 }

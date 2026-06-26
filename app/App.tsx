@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppStateContext';
+import { AuthProvider } from './src/state/AuthContext';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -19,9 +20,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AppStateProvider>
-        <AppNavigator />
-      </AppStateProvider>
+      <AuthProvider>
+        <AppStateProvider>
+          <AppNavigator />
+        </AppStateProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

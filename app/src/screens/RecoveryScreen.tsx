@@ -19,6 +19,7 @@ import { Card } from '../components/Card';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { useAppState, useDeviceSummary } from '../state/AppStateContext';
+import { useAuth } from '../state/AuthContext';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,6 +37,7 @@ type SendState = 'idle' | 'sending' | 'sent' | 'error';
 export function RecoveryScreen() {
   const device = useDeviceSummary();
   const { state, refresh } = useAppState();
+  const { confirmWithBiometrics } = useAuth();
   const alertId = state.latestConfirmedAlertId;
   const inRecovery = device.status === 'recovery';
 
@@ -62,6 +64,8 @@ export function RecoveryScreen() {
 
   const handleSend = async () => {
     if (!canSubmit || !alertId) return;
+    const verified = await confirmWithBiometrics('Confirm sending the Police Pack');
+    if (!verified) return;
     setSendState('sending');
     setErrorMessage('');
     try {
