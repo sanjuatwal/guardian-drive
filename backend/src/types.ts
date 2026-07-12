@@ -1,4 +1,19 @@
 // Mirrors app/src/types/app.ts so the app can consume /state responses directly.
+export type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  created_at: number;
+};
+
+export type SessionRow = {
+  token: string;
+  user_id: string;
+  created_at: number;
+  expires_at: number;
+};
+
 export type DeviceStatus = 'protected' | 'service' | 'alert' | 'recovery' | 'offline' | 'degraded';
 export type PrivacyMode = 'private' | 'balanced' | 'recovery' | 'always-on';
 export type MaintenanceMode = 'off' | 'service' | 'valet' | 'towing';
@@ -104,5 +119,9 @@ export type AppState = {
   device: DeviceSummary;
   recentActivity: ActivityEvent[];
   currentAlert: AlertSummary | null;
+  // Most recent confirmed alert, regardless of how long ago. Confirmed
+  // alerts drop out of currentAlert (which only tracks 'active'), so the app
+  // needs this to know which incident to send a Police Pack for.
+  latestConfirmedAlertId: string | null;
   privacyMode: PrivacyMode;
 };

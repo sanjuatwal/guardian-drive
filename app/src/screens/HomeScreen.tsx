@@ -9,6 +9,7 @@ import { Card, SectionLabel } from '../components/Card';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { useAppState } from '../state/AppStateContext';
+import { useAuth } from '../state/AuthContext';
 import { MaintenanceMode } from '../types/app';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -53,6 +54,7 @@ function SummaryChip({ icon, label, value }: { icon: IoniconName; label: string;
 
 export function HomeScreen() {
   const { state, connection, refresh } = useAppState();
+  const { confirmWithBiometrics } = useAuth();
   const [sirenActive, setSirenActive] = React.useState(false);
   const [sirenSeconds, setSirenSeconds] = React.useState(0);
   const [stopBusy, setStopBusy] = React.useState(false);
@@ -68,6 +70,8 @@ export function HomeScreen() {
 
   const handleTriggerSiren = async () => {
     if (sirenActive) return;
+    const verified = await confirmWithBiometrics('Confirm you want to trigger the siren');
+    if (!verified) return;
     await triggerSiren();
     setSirenSeconds(0);
     setSirenActive(true);

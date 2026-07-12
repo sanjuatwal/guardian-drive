@@ -53,6 +53,7 @@ export function toAppState(
   device: DeviceRow,
   events: EventRow[],
   activeAlert: AlertRow | null,
+  latestConfirmedAlertId: string | null,
 ): AppState {
   const now = Date.now();
   return {
@@ -65,6 +66,7 @@ export function toAppState(
           reasons: JSON.parse(activeAlert.reasons_json) as string[],
         }
       : null,
+    latestConfirmedAlertId,
     privacyMode: device.privacy_mode,
   };
 }
