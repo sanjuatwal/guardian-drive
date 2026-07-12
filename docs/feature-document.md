@@ -101,6 +101,7 @@ Full automatic vs. confirmed action reference:
 | Police pack | Prepared automatically | Shared after user confirms |
 | Start inhibit (before engine starts) | Yes in high-security mode | Optional per user setting |
 | Next-start inhibit (after confirmed theft, car stops) | Yes, once speed < 8 km/h | Confirmation required once |
+| Hijack Mode (duress) | No — manual only | Yes, owner-initiated + biometric gate (see Section 3) |
 | Engine cut while moving | Not a product feature | Too dangerous — removed |
 
 Siren policy and owner override:
@@ -141,6 +142,19 @@ No-response timeline (owner does not tap anything):
 | T+0s | Alert fires. If Theft Mode is already active (Automatic path), the full Layer 1 bundle continues regardless of response. If Theft Candidate, only the critical alert and local evidence logging are active. |
 | T+60s | Emergency contacts notified, per the Layer 1 table above. Alert remains active and dismissible. For a Theft Candidate, this does NOT itself escalate to Theft Mode — only "Confirm Theft" does. |
 | Any time after | Owner can still tap "It's me" or "Confirm Theft" from the Alerts tab. No silent timeout ever escalates a Theft Candidate into Theft Mode or activates live GPS sharing for one — only an explicit "Confirm Theft" tap does. This preserves the Private/Balanced privacy guarantees in Section 11 even if the owner is asleep or unreachable. |
+
+#### Third path: Hijack Mode — owner-initiated duress trigger (V1.5, DECISION 2026-06-22)
+
+The two paths above both rely on the sensor truth table (Section 12: no phone + no key tag nearby). That table cannot detect a **carjacking** — the owner's phone and key tag are physically in the car, so presence looks "normal" to the sensors even though the owner is being forced out or forced to drive. Hijack Mode closes that gap with a **manual, owner-initiated** trigger, modeled on StarLine's app-activated anti-hijack pattern (see competitive-analysis.md) but adapted to Guardian Drive's safety rules.
+
+| Aspect | Behavior |
+|---|---|
+| Trigger | A dedicated "Hijack / Duress" quick action in the app (same pattern as the existing manual siren-trigger quick action), reachable in one or two taps from the home screen |
+| Activation gate | Requires biometric (Face ID/fingerprint) confirmation before it arms — **not** to slow down a genuine activation (biometric is sub-second on an already-unlocked phone), but to prevent accidental taps or misuse from triggering a false duress event. This mirrors the existing "It's me" biometric gate (Section 6): biometric gates *deliberate manual owner actions*, never the automatic sensor-triggered path. |
+| Siren | **Silent by default — no siren.** This is the key difference from automatic Theft Mode: the owner may be physically present and at risk, and an audible siren could escalate a confrontation. (Automatic Theft Mode keeps the siren, since it targets an empty parked car with no one in danger.) |
+| GPS / evidence | Live GPS sharing activates immediately regardless of privacy mode (same exception already defined for confirmed theft, Section 11), evidence lock applies, next-start inhibit arms — still speed-gated at <8 km/h per the rule above; Hijack Mode never stops a moving vehicle, same as every other path. |
+| Emergency contacts / police | Notified immediately on activation — does not wait for the normal 60-second no-response window, since the trigger itself is already an explicit owner confirmation of an emergency. |
+| Relationship to automatic Theft Mode | Independent and additive. Hijack Mode does not change, gate, delay, or replace the automatic Section 12 truth-table trigger in any way — that path remains immediate and confirmation-free. |
 
 ### 4. Recovery Mode
 
@@ -184,6 +198,7 @@ No-response timeline (owner does not tap anything):
 - Mobile app dashboard showing status, battery, last location, and alerts.
 - Risk scoring so the owner sees why an alert was triggered.
 - Two-step confirmation flow: "It's me" and biometric confirmation.
+- Hijack/Duress quick action (V1.5, Section 3): owner-initiated, biometric-gated, silent (no siren) trigger for carjacking scenarios the sensor truth table can't detect.
 - Household access profiles for multiple authorized drivers.
 - Service mode, valet mode, and tow approval mode to suppress false alerts during authorized use (see Feature 9).
 - Geofenced sensitivity for home and work.
@@ -597,6 +612,7 @@ Reduces false alarms and adds professional-use modes.
 - Door / hood / trunk open correlation
 - Adaptive risk scoring improvements
 - Secure cryptographic evidence lock
+- Hijack Mode — owner-initiated duress trigger (Section 3): covers carjacking scenarios where presence-based auto-detection looks normal; placed here rather than MVP since it's additive to the already-built Theft Mode bundle, not core detection logic
 
 ### V2 — Monetization and Scale
 
