@@ -168,7 +168,7 @@ void checkRemoteCommands() {
 
 void scanI2C() {
   Serial.println("I2C scan starting...");
-  Wire.begin(8, 9);
+  Wire.begin(13, 14);  // Waveshare ESP32-S3-SIM7670G: SDA=GPIO13, SCL=GPIO14
 
   int found = 0;
   for (uint8_t address = 1; address < 127; address++) {
@@ -330,7 +330,7 @@ void processReading(const IMUReading& r) {
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+  delay(500);
   Serial.println("Guardian Drive — ESP32-S3 online.");
 
   threatResponse.begin();
