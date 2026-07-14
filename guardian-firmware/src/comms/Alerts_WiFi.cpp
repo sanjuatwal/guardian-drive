@@ -70,6 +70,8 @@ bool AlertsWiFi::checkFalseAlarm() {
     const String body = http.getString();
     falseAlarm = body.indexOf("siren_off") != -1;
     pendingSirenTrigger_ = body.indexOf("siren_on") != -1;
+    if (body.indexOf("gps_tracking_on") != -1)  gpsTrackingAlwaysOn_ = true;
+    if (body.indexOf("gps_tracking_off") != -1) gpsTrackingAlwaysOn_ = false;
   }
   http.end();
 

@@ -11,6 +11,7 @@
 #include "actuators/Siren_Buzzer.h"
 #include "sensors/ProximityChecker_BLE.h"
 #include "comms/Alerts_WiFi.h"
+#include "gps/GNSS_SIM7670G.h"
 
 IMUSensorMPU6050 imu;
 EventLogger eventLogger;
@@ -20,6 +21,7 @@ ThreatResponse threatResponse(siren);
 AuthorizedModes authorizedModes;
 ProximityCheckerBLE proximityChecker;
 AlertsWiFi alerts;
+GNSS_SIM7670G gnss;
 
 namespace {
 constexpr int kBaselineSampleCount = 50;
@@ -30,6 +32,7 @@ constexpr float kBaselineStableMagnitudeToleranceG = 0.05f;  // only calibrate w
 constexpr float kImpactThresholdG = 0.5f;
 constexpr unsigned long kImpactCooldownMs = 1000;
 constexpr unsigned long kFalseAlarmPollIntervalMs = 3000;
+constexpr unsigned long kGpsPollIntervalMs = 20000;  // poll GNSS every 20 s
 }
 
 int baselineSamples = 0;
@@ -43,6 +46,8 @@ bool tiltAlertActive = false;
 bool imuOnline = false;
 unsigned long lastImpactMs = 0;
 unsigned long lastFalseAlarmPollMs = 0;
+unsigned long lastGpsPollMs = 0;
+bool gnssOnline = false;
 
 void resetBaseline() {
   baselineSamples = 0;
@@ -328,6 +333,42 @@ void processReading(const IMUReading& r) {
   }
 }
 
+void pollGPS() {
+  const DeviceState state = stateManager.currentState();
+  const bool alwaysOn = alerts.gpsTrackingAlwaysOn();
+
+  // Default: only track during suspicious/theft. If always-on, track in any state.
+  if (!alwaysOn && state == DeviceState::kNormal) return;
+
+  // Poll faster while actively in theft mode
+  const unsigned long interval =
+      (state == DeviceState::kTheftMode) ? 5000UL : kGpsPollIntervalMs;
+
+  const unsigned long now = millis();
+  if (now - lastGpsPollMs < interval) return;
+  lastGpsPollMs = now;
+
+  GPSReading gps;
+  if (!gnss.read(gps)) return;
+
+  static char payload[128];
+  snprintf(payload, sizeof(payload),
+           "lat:%.6f,lon:%.6f,alt_m:%.1f,speed_kmh:%.1f,utc:%s",
+           gps.latitude, gps.longitude, gps.altitudeM, gps.speedKmh, gps.utcTime);
+
+  Event evt;
+  evt.event_id = eventLogger.nextEventId();
+  evt.sensor_type = "gps_location";
+  evt.severity = (state == DeviceState::kTheftMode) ? EventSeverity::kHigh : EventSeverity::kInfo;
+  evt.timestamp_ms = now;
+  evt.payload = payload;
+
+  eventLogger.log(evt);
+  alerts.sendEvent(evt);
+  Serial.printf("[GPS] Fix: lat=%.6f lon=%.6f alt=%.1fm speed=%.1fkm/h utc=%s\n",
+                gps.latitude, gps.longitude, gps.altitudeM, gps.speedKmh, gps.utcTime);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -340,6 +381,13 @@ void setup() {
   Serial.println("Mode bench commands: 's'=toggle service mode, 'v'=toggle valet mode, 'w'=toggle tow mode");
   Serial.println("Proximity: phone presence is now driven by real BLE link. 'p'=force phone override, 'k'=toggle simulated key tag");
   Serial.println("Defaults: no phone connected + no key tag — suspicious tilt auto-triggers Theft Mode (Section 12)");
+
+  gnssOnline = gnss.begin();
+  if (gnssOnline) {
+    Serial.println("SIM7670G GNSS init: OK");
+  } else {
+    Serial.println("SIM7670G GNSS init: FAIL (modem may need more time — will retry)");
+  }
 
   scanI2C();
 
@@ -355,6 +403,18 @@ void loop() {
   handleSerialCommands();
   threatResponse.update(stateManager.currentState());
   checkRemoteCommands();
+
+  if (!gnssOnline) {
+    // Only retry GPS init every 30s — begin() already spends ~10s probing
+    static unsigned long lastGnssTryMs = 0;
+    const unsigned long now2 = millis();
+    if (now2 - lastGnssTryMs >= 30000) {
+      lastGnssTryMs = now2;
+      gnssOnline = gnss.begin();
+    }
+  } else {
+    pollGPS();
+  }
 
   if (!imuOnline) {
     // Keep retrying so wiring fixes can be checked live without reflashing.

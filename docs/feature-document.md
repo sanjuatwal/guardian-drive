@@ -397,6 +397,44 @@ Signal loss + motion      → Low-priority alert
 Signal loss + tamper/OBD  → High-priority alert
 Signal loss + power cut   → Theft mode triggered
 
+### 10b. Cellular Data SIM Strategy — DECISION 2026-07-13
+
+**Decision: Simbase for production. Hologram for prototype.**
+
+**SIM type required:** Regular LTE Cat-1 (SIM7670G is Cat-1, not LTE-M/NB-IoT — 1NCE ruled out, incompatible.)
+
+**Why Simbase (production):**
+- **$0 when SIM is inactive** — no monthly fee, no standby fee, no pause fee
+- CA$0.02/day only on days the SIM is actively on cellular
+- CA$0.03/MB data rate
+- Roams Rogers + Bell + Telus automatically
+- No contracts, reactivate anytime
+
+**Cost model per device per year:**
+- No theft, car always on home WiFi: **$0**
+- 1 theft, 2-hour tracking session: ~$0.04 (2 active days) + ~$0.007 (216 KB data) = **under $0.10 CAD**
+- Worst case (SIM active every day of year): CA$7.30/year
+
+**Data budget during theft mode:**
+- GPS ping ≈ 150 bytes × 720 pings/hour ≈ 108 KB/hour
+- 3-hour recovery window ≈ 325 KB ≈ less than $0.01 in data
+
+**Provider comparison:**
+
+| Provider | Idle cost | Per MB | Cat-1 Canada | Verdict |
+|---|---|---|---|---|
+| **Simbase** | **$0 inactive** | CA$0.03 | ✅ Rogers+Bell+Telus | **Production choice** |
+| Hologram | $1 USD/month always | $0.03 | ✅ | $12/year even if never used — prototype only |
+| Telnyx | $0.20/month standby | $0.0125 | ✅ | $2.40/year idle — cheaper data but still has idle cost |
+| Things Mobile | $0 claimed | $0.10 | ✅ | Too expensive per MB |
+| 1NCE | $0 one-time | Included | ❌ LTE-M only | Incompatible with SIM7670G |
+
+**WiFi-first, cellular-fallback architecture (already implemented):**
+- Device uses home WiFi at no cost while parked at home
+- When car leaves WiFi range (theft scenario), cellular takes over automatically
+- No user configuration required
+- For prototype phase: use Hologram ($1 USD/month) — simpler onboarding, swap to Simbase before first production unit ships
+
 ### 11. Privacy and GPS Sharing Control
 
 Guardian Drive does not require always-on location sharing for normal use. This is a product differentiator: "Your car is protected without turning your life into a tracking log."
