@@ -11,6 +11,12 @@
 
 #define DEVICE_ID "guardian-dev-01"
 
+// --- SIM7670G UART + power (Waveshare ESP32-S3-SIM7670G board) ---
+// GPIO17 = ESP RX ← SIM TX, GPIO18 = ESP TX → SIM RX, GPIO33 = modem power enable
+#define SIM_UART_RX  17
+#define SIM_UART_TX  18
+#define SIM_PWRKEY   33
+
 // --- BLE owner-phone proximity (feature-document.md Section 12) ---
 // The car unit advertises this service; the phone app scans for it, connects,
 // and writes OWNER_AUTH_TOKEN to prove it is the owner's phone. These three

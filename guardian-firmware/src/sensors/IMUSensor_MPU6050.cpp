@@ -12,8 +12,8 @@ constexpr float kEmaAlpha = 0.3f;  // ~3-sample (~0.9s @300ms loop) settle time
 IMUSensorMPU6050::IMUSensorMPU6050(uint8_t i2cAddress) : addr_(i2cAddress) {}
 
 bool IMUSensorMPU6050::begin() {
-  // Freenove ESP32-S3 common I2C pins: SDA=GPIO8, SCL=GPIO9
-  Wire.begin(8, 9);
+  // Waveshare ESP32-S3-SIM7670G: SDA=GPIO13, SCL=GPIO14
+  Wire.begin(13, 14);
   delay(50);
 
   // Wake the MPU-6050 (sleep bit off)

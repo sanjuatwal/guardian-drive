@@ -3,9 +3,9 @@
 #include <Arduino.h>
 
 namespace {
-// Freenove ESP32-S3: GPIO4 is free (I2C uses 8/9). Active buzzer module:
-// VCC -> 5V, GND -> GND, I/O -> this pin.
-constexpr int kSirenPin = 4;
+// Waveshare ESP32-S3-SIM7670G: GPIO21 is free (GPIO4 = SDMMC_CMD on this board).
+// Active buzzer: VCC -> 3.3V, GND -> GND, I/O -> this pin.
+constexpr int kSirenPin = 1;
 }  // namespace
 
 bool SirenBuzzer::begin() {
