@@ -14,6 +14,25 @@ export type SessionRow = {
   expires_at: number;
 };
 
+export type DeviceDriverRow = {
+  id: string;
+  device_id: string;
+  user_id: string;
+  joined_at: number;
+};
+
+export type DriverInviteRow = {
+  id: string;
+  device_id: string;
+  code: string;
+  email: string;
+  invited_by: string;
+  created_at: number;
+  expires_at: number;
+  accepted_at: number | null;
+  accepted_by: string | null;
+};
+
 export type DeviceStatus = 'protected' | 'service' | 'alert' | 'recovery' | 'offline' | 'degraded';
 export type PrivacyMode = 'private' | 'balanced' | 'recovery' | 'always-on';
 export type MaintenanceMode = 'off' | 'service' | 'valet' | 'towing';

@@ -16,4 +16,8 @@ export const config = {
   // recipient. Police Pack requests fail with 503 until this is set.
   resendApiKey: process.env.RESEND_API_KEY ?? null,
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? 'Guardian Drive <onboarding@resend.dev>',
+  // This is a single-device prototype: there's no "register your car" flow,
+  // so the first user to ever log in is auto-added as this device's first
+  // driver. Everyone after that needs an invite. See drivers.ts.
+  defaultDeviceId: process.env.DEFAULT_DEVICE_ID ?? 'demo-device',
 };

@@ -14,6 +14,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { EnableBiometricsScreen } from '../screens/EnableBiometricsScreen';
 import { UnlockScreen } from '../screens/UnlockScreen';
+import { DriversScreen } from '../screens/DriversScreen';
 import { useAppState } from '../state/AppStateContext';
 import { useAuth } from '../state/AuthContext';
 import { colors, fonts } from '../../theme/tokens';
@@ -119,6 +120,7 @@ export function AppNavigator() {
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Alert" component={AlertScreen} options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="Drivers" component={DriversScreen} />
           </Stack.Navigator>
         </>
       )}
