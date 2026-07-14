@@ -111,3 +111,34 @@ export function sendPolicePack(
     body: JSON.stringify({ recipientName, recipientEmail }),
   });
 }
+
+export type DriverSummary = { id: string; name: string; email: string; joinedAt: number };
+export type PendingInviteSummary = { id: string; email: string; createdAt: number; expiresAt: number };
+export type DriversResponse = {
+  drivers: DriverSummary[];
+  pendingInvites: PendingInviteSummary[];
+  maxDrivers: number;
+};
+
+export function fetchDrivers(): Promise<DriversResponse> {
+  return request(`/api/v1/devices/${DEVICE_ID}/drivers`);
+}
+
+export function inviteDriver(email: string): Promise<{ ok: boolean }> {
+  return request(`/api/v1/devices/${DEVICE_ID}/drivers/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function removeDriver(userId: string): Promise<{ ok: boolean }> {
+  return request(`/api/v1/devices/${DEVICE_ID}/drivers/${userId}`, { method: 'DELETE' });
+}
+
+export function cancelDriverInvite(inviteId: string): Promise<{ ok: boolean }> {
+  return request(`/api/v1/devices/${DEVICE_ID}/drivers/invites/${inviteId}`, { method: 'DELETE' });
+}
+
+export function acceptDriverInvite(code: string): Promise<{ ok: boolean; deviceId: string }> {
+  return request(`/api/v1/drivers/accept-invite`, { method: 'POST', body: JSON.stringify({ code }) });
+}

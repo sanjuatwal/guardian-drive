@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +15,8 @@ export function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [showInviteCode, setShowInviteCode] = React.useState(false);
+  const [inviteCode, setInviteCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -24,8 +26,18 @@ export function LoginScreen() {
     if (!canSubmit) return;
     setBusy(true);
     setError('');
+    const trimmedCode = inviteCode.trim();
     try {
-      await login(email.trim(), password);
+      const { inviteError } = await login(email.trim(), password, trimmedCode || undefined);
+      // The screen unmounts immediately on success (phase change), so an
+      // inline message wouldn't be visible — use a native Alert instead.
+      if (trimmedCode) {
+        if (inviteError) {
+          Alert.alert('Invite Code Issue', inviteError);
+        } else {
+          Alert.alert('Joined as Driver', "You've been added as a driver for this vehicle.");
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
     } finally {
@@ -68,6 +80,25 @@ export function LoginScreen() {
             editable={!busy}
           />
         </View>
+
+        {showInviteCode ? (
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Invite Code</Text>
+            <TextInput
+              style={styles.input}
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              placeholder="e.g. USX5B75H"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+              editable={!busy}
+            />
+          </View>
+        ) : (
+          <TouchableOpacity activeOpacity={0.7} disabled={busy} onPress={() => setShowInviteCode(true)}>
+            <Text style={styles.linkText}>Have an invite code from another driver?</Text>
+          </TouchableOpacity>
+        )}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 

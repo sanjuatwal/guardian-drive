@@ -2,7 +2,14 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
-import { login as apiLogin, logout as apiLogout, signup as apiSignup, PublicUser, setAuthToken } from '../api/client';
+import {
+  acceptDriverInvite,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+  PublicUser,
+  setAuthToken,
+} from '../api/client';
 
 const TOKEN_KEY = 'gd_auth_token';
 const BIOMETRIC_KEY = 'gd_biometric_enabled';
@@ -22,7 +29,10 @@ type AuthContextValue = {
   biometricEnabled: boolean;
   biometricAvailable: boolean;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  // inviteCode is optional — a normal login passes none. If provided and
+  // valid, the user joins as a driver right after authenticating; if it's
+  // bad/expired, login still succeeds (the code error is just surfaced).
+  login: (email: string, password: string, inviteCode?: string) => Promise<{ inviteError?: string }>;
   logout: () => Promise<void>;
   unlockWithBiometrics: () => Promise<boolean>;
   enableBiometrics: () => Promise<boolean>;
@@ -82,10 +92,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, inviteCode?: string) => {
       const res = await apiLogin(email, password);
       await persistSession(res.user, res.token);
+
+      let inviteError: string | undefined;
+      const trimmedCode = inviteCode?.trim();
+      if (trimmedCode) {
+        try {
+          await acceptDriverInvite(trimmedCode);
+        } catch (e) {
+          // Non-blocking: a bad/expired code shouldn't prevent a normal login.
+          inviteError = e instanceof Error ? e.message : 'Could not accept invite code';
+        }
+      }
+
       afterAuth();
+      return { inviteError };
     },
     [persistSession, afterAuth],
   );

@@ -81,6 +81,30 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+  CREATE TABLE IF NOT EXISTS device_drivers (
+    id        TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL REFERENCES devices(id),
+    user_id   TEXT NOT NULL REFERENCES users(id),
+    joined_at INTEGER NOT NULL,
+    UNIQUE(device_id, user_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_device_drivers_device ON device_drivers(device_id);
+
+  CREATE TABLE IF NOT EXISTS driver_invites (
+    id          TEXT PRIMARY KEY,
+    device_id   TEXT NOT NULL REFERENCES devices(id),
+    code        TEXT NOT NULL UNIQUE,
+    email       TEXT NOT NULL,
+    invited_by  TEXT NOT NULL REFERENCES users(id),
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    accepted_at INTEGER,
+    accepted_by TEXT REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_driver_invites_device ON driver_invites(device_id);
 `);
 
 // Migration: maintenance_mode ('off' | 'service' | 'valet' | 'towing')

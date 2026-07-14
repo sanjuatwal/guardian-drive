@@ -7,6 +7,7 @@ import { alertsRouter } from './routes/alerts';
 import { authRouter } from './routes/auth';
 import { commandsRouter } from './routes/commands';
 import { devicesRouter } from './routes/devices';
+import { driversRouter } from './routes/drivers';
 import { legacyEventsRouter } from './routes/legacyEvents';
 
 const app = express();
@@ -19,6 +20,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/devices', devicesRouter);
 app.use('/api/v1/alerts', alertsRouter);
+app.use('/api/v1', driversRouter);
 
 // Legacy endpoints consumed directly by guardian-firmware (ESP32):
 // POST /api/events and GET /api/commands?device_id=...

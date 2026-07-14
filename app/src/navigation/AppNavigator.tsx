@@ -14,6 +14,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { EnableBiometricsScreen } from '../screens/EnableBiometricsScreen';
 import { UnlockScreen } from '../screens/UnlockScreen';
+import { DriversScreen } from '../screens/DriversScreen';
 import { useAppState } from '../state/AppStateContext';
 import { useAuth } from '../state/AuthContext';
 import { colors, fonts } from '../../theme/tokens';
@@ -84,6 +85,10 @@ function AlertWatcher() {
   const { state } = useAppState();
   const hasAlert = state.currentAlert !== null;
 
+  // Depend on the alert object itself (not just the boolean) so this re-runs
+  // on every poll. Without this, if the user back-navigates from the Alert
+  // screen without dismissing, hasAlert stays true but never changes, and the
+  // effect never fires again — leaving them stuck on the home screen.
   useEffect(() => {
     if (!navigationRef.isReady()) return;
     const currentRoute = navigationRef.getCurrentRoute()?.name;
@@ -92,7 +97,7 @@ function AlertWatcher() {
     } else if (!hasAlert && currentRoute === 'Alert' && navigationRef.canGoBack()) {
       navigationRef.goBack();
     }
-  }, [hasAlert]);
+  }, [state.currentAlert]);
 
   return null;
 }
@@ -119,6 +124,7 @@ export function AppNavigator() {
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Alert" component={AlertScreen} options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="Drivers" component={DriversScreen} />
           </Stack.Navigator>
         </>
       )}

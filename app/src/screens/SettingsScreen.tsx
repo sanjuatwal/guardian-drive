@@ -1,5 +1,6 @@
 import React from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, fonts, radius, spacing } from '../../theme/tokens';
@@ -31,6 +32,7 @@ function SettingRow({ icon, label, value, onPress, destructive }: SettingRowProp
 }
 
 export function SettingsScreen() {
+  const navigation = useNavigation();
   const { state } = useAppState();
   const { user, biometricEnabled, logout } = useAuth();
   const privacyLabel = state.privacyMode.charAt(0).toUpperCase() + state.privacyMode.slice(1);
@@ -51,6 +53,15 @@ export function SettingsScreen() {
         <SettingRow icon="person-outline" label={user?.name ?? 'Signed in'} value={user?.email} />
         <View style={styles.divider} />
         <SettingRow icon="log-out-outline" label="Log Out" onPress={handleLogout} destructive />
+      </Card>
+
+      <SectionLabel>Vehicle</SectionLabel>
+      <Card style={styles.listCard}>
+        <SettingRow
+          icon="people-outline"
+          label="Manage Drivers"
+          onPress={() => navigation.navigate('Drivers' as never)}
+        />
       </Card>
 
       <SectionLabel>Security</SectionLabel>
