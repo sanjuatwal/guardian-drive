@@ -25,7 +25,7 @@ type AppStateContextValue = {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 5_000;
 const SOCKET_RETRY_MS = 5_000;
 
 export function AppStateProvider({ children }: { children: ReactNode }) {

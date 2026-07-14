@@ -242,6 +242,24 @@ void handleSerialCommands() {
 
 void processReading(const IMUReading& r) {
   const float accelMagnitude = sqrtf(r.ax * r.ax + r.ay * r.ay + r.az * r.az);
+
+  // All-zero reading means the MPU-6050 lost I2C contact (loose wire after
+  // tilting is the common cause) — a real sensor always reads ~1g of gravity.
+  // Count consecutive bad reads; after 5 in a row, force a re-init so the
+  // sensor recovers automatically when the connection is restored.
+  static int zeroReadCount = 0;
+  if (accelMagnitude < 0.1f) {
+    zeroReadCount++;
+    Serial.printf("IMU: near-zero magnitude (%d consecutive) — I2C fault or sensor sleeping\n", zeroReadCount);
+    if (zeroReadCount >= 5) {
+      Serial.println("IMU: too many bad reads — marking offline for re-init");
+      imuOnline = false;
+      zeroReadCount = 0;
+    }
+    return;
+  }
+  zeroReadCount = 0;
+
   const float accelMagnitudeDelta = fabsf(accelMagnitude - 1.0f);
   const unsigned long now = millis();
 

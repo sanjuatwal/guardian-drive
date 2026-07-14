@@ -85,6 +85,10 @@ function AlertWatcher() {
   const { state } = useAppState();
   const hasAlert = state.currentAlert !== null;
 
+  // Depend on the alert object itself (not just the boolean) so this re-runs
+  // on every poll. Without this, if the user back-navigates from the Alert
+  // screen without dismissing, hasAlert stays true but never changes, and the
+  // effect never fires again — leaving them stuck on the home screen.
   useEffect(() => {
     if (!navigationRef.isReady()) return;
     const currentRoute = navigationRef.getCurrentRoute()?.name;
@@ -93,7 +97,7 @@ function AlertWatcher() {
     } else if (!hasAlert && currentRoute === 'Alert' && navigationRef.canGoBack()) {
       navigationRef.goBack();
     }
-  }, [hasAlert]);
+  }, [state.currentAlert]);
 
   return null;
 }

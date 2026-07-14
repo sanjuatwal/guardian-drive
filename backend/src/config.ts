@@ -9,7 +9,7 @@ export const config = {
   // Optional shared secret for device ingestion. When unset, ingestion is open (prototype mode).
   deviceApiKey: process.env.DEVICE_API_KEY ?? null,
   // Events within this window are treated as one cluster by the risk engine.
-  clusterWindowMs: 10 * 60 * 1000,
+  clusterWindowMs: 2 * 60 * 1000,
   // A cluster scoring at or above this creates an alert.
   alertThreshold: 70,
   // Resend (resend.com) — used to email the Police Pack PDF directly to the
